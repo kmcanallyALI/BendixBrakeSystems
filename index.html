@@ -91,8 +91,70 @@ function docsByIds(ids){ return REFERENCE_DOCS.filter(d => ids.includes(d.id)); 
 /* ---------------- SECTIONS ---------------- */
 const SECTIONS = [
 {
+  key:"dvom",
+  title:"1. DVOM Basics: Safe & Accurate Electrical Testing",
+  refs:[],
+  interactive:"dvom",
+  content:`
+    <p>Before troubleshooting any Bendix electrical circuit, you need to be safe and accurate with a
+    Digital Volt-Ohm-Milliammeter (DVOM). This section covers the ground rules and lets you practice on a
+    simple circuit before you touch a real harness.</p>
+
+    <h3>The three things you're measuring</h3>
+    <table>
+      <tr><th>Term</th><th>Symbol / Unit</th><th>Plain-language definition</th></tr>
+      <tr><td><b>Volt</b></td><td>V</td><td>Electrical "pressure" — the force pushing current through a circuit. Measured across (in parallel with) two points.</td></tr>
+      <tr><td><b>Amp</b></td><td>A</td><td>The rate of electrical flow — how much current is actually moving. Measured in series, in the path of the current itself.</td></tr>
+      <tr><td><b>Ohm</b></td><td>Ω</td><td>Resistance — how much a component opposes current flow. Measured across a de-energized component.</td></tr>
+    </table>
+
+    <div class="fact-box"><b>Ohm's Law</b> ties all three together: <b>Volts = Amps × Ohms</b> (V = I × R).
+    Know any two and you can calculate the third. A 12V circuit with a 4Ω load draws 3 amps
+    (12 ÷ 4 = 3). If that same load only draws 1 amp, something's adding resistance somewhere
+    (a bad connection, corrosion, a partially open circuit).
+    </div>
+
+    <div class="warn-box"><b>Never pierce a wire's insulation to take a reading.</b> A piercing probe (or
+    a needle, paperclip, etc. jammed through the jacket) creates a pinhole that lets moisture and corrosion
+    into the conductor. That corrosion spreads inside the insulation over time and causes an intermittent
+    fault weeks or months later — one that's far harder to find than the one you were originally chasing.
+    Always test at a proper connector, terminal, or back-probe point designed for it.</div>
+
+    <div class="warn-box"><b>Don't force probes into a connector.</b> Jamming a meter probe into a sealed
+    connector cavity can spread the female terminal or bend a male pin — creating a bad connection that
+    didn't exist before you started testing. Use the factory back-probe location, a breakout harness, or
+    test at an accessible splice — not by wedging a probe past the seal.</div>
+
+    <h3>Practice: a simple light circuit</h3>
+    <p>Below is a basic 12V circuit: a battery, a switch, and a lamp (the load), connected by wire. Four
+    test points (A, B, C, D) sit at the connections between components. Select a meter function, then drag
+    each probe onto a test point to take a reading. Try all three meter functions, and try the switch and
+    power toggles to see how the readings change.</p>
+    <div id="dvomWidgetRoot"></div>
+  `,
+  quiz:[
+    {q:"What does a Volt measure?",
+     opts:["The rate of current flow","Electrical pressure/force pushing current through a circuit","Resistance to current flow","The size of a wire"], a:1},
+    {q:"What does an Amp measure?",
+     opts:["Electrical pressure","The rate of electrical current flow","Resistance","Wire insulation thickness"], a:1},
+    {q:"What does an Ohm measure?",
+     opts:["Current flow rate","Voltage drop only","Resistance to current flow","Battery capacity"], a:2},
+    {q:"According to Ohm's Law, if a 12V circuit has a 4Ω load, how many amps will it draw?",
+     opts:["1 amp","3 amps","8 amps","48 amps"], a:1},
+    {q:"Why should you never pierce a wire's insulation to take a meter reading?",
+     opts:["It's slower than other methods","It lets moisture and corrosion into the conductor, causing a future intermittent fault","It voids the DVOM warranty","Piercing tools are expensive"], a:1},
+    {q:"Why shouldn't you force a meter probe into a sealed connector cavity?",
+     opts:["It can spread the female terminal or bend a male pin, creating a new bad connection","It will trip a circuit breaker","It discharges the battery","It's against OSHA rules"], a:0},
+    {q:"To measure current (Amps) correctly, the meter must be connected:",
+     opts:["Across two points, just like a voltmeter","In series, in the actual path the current flows through","Only when the circuit is de-energized","It doesn't matter how it's connected"], a:1},
+    {q:"To measure resistance (Ohms) correctly, the circuit should be:",
+     opts:["Fully powered and under load","De-energized (power disconnected)","Running at high RPM","Submerged in water"], a:1}
+  ]
+},
+{
+
   key:"power",
-  title:"1. Power Supply & ESP System Basics",
+  title:"2. Power Supply & ESP System Basics",
   refs:["esp"],
   content:`
     <p>Andrews units are equipped with the <b>Bendix ESP EC-80</b> controller — the top tier of the EC-80
@@ -136,7 +198,7 @@ const SECTIONS = [
 },
 {
   key:"wss-pmv",
-  title:"2. Wheel Speed Sensors, PMVs & Traction/Stability Valves",
+  title:"3. Wheel Speed Sensors, PMVs & Traction/Stability Valves",
   refs:["esp"],
   content:`
     <p>Wheel speed sensor (WSS) and pressure modulator valve (PMV) checks are the same starting point on ESP
@@ -178,7 +240,7 @@ const SECTIONS = [
 },
 {
   key:"stability",
-  title:"3. Stability Sensors: SAS, Yaw Rate/Lateral Accel & ABS Pressure",
+  title:"4. Stability Sensors: SAS, Yaw Rate/Lateral Accel & ABS Pressure",
   refs:["esp"],
   content:`
     <p>This section is unique to ESP-equipped units — these sensors don't exist on plain ABS or ATC
@@ -224,7 +286,7 @@ const SECTIONS = [
 },
 {
   key:"j1939-blink",
-  title:"4. J1939 Communications & Blink Code Diagnostics",
+  title:"5. J1939 Communications & Blink Code Diagnostics",
   refs:["esp"],
   content:`
     <p>Blink codes let you troubleshoot without a laptop. The ABS indicator lamp blinks two-digit code
@@ -269,7 +331,7 @@ const SECTIONS = [
 },
 {
   key:"fusion",
-  title:"5. Fusion System: FLC-25 Camera & FLR-25 Radar",
+  title:"6. Fusion System: FLC-25 Camera & FLR-25 Radar",
   refs:["camera","radar"],
   content:`
     <p>The Bendix Fusion system pairs the FLR-25 radar and FLC-25 camera with the ESP EC-80 controller to
@@ -312,7 +374,7 @@ const SECTIONS = [
 },
 {
   key:"wiring",
-  title:"6. Wiring, Harnesses & Connectors",
+  title:"7. Wiring, Harnesses & Connectors",
   refs:["esp","camera","radar"],
   content:`
     <p>Most intermittent ESP and Fusion faults trace back to connectors and harness routing, not the
@@ -380,7 +442,8 @@ function render(){
   app.innerHTML = "";
   if(state.screen === "welcome") return renderWelcome();
   if(state.screen === "reviewHome") return renderReviewHome();
-  if(state.screen === "section") return renderSection();
+  if(state.screen === "sectionContent") return renderSectionContent();
+  if(state.screen === "sectionQuiz") return renderSectionQuiz();
   if(state.screen === "certificate") return renderCertificate();
 }
 
@@ -427,7 +490,7 @@ async function onWelcomeContinue(){
     }
   } catch(e){ /* endpoint not deployed yet in local preview — fall through */ }
   state.reviewMode = false;
-  state.screen = "section";
+  state.screen = "sectionContent";
   state.sectionIndex = 0;
   render();
 }
@@ -450,50 +513,84 @@ function renderReviewHome(){
     <p><button class="btn-secondary" id="retakeBtn">Retake the full test anyway</button></p>
   `;
   app.appendChild(card);
-  document.getElementById("retakeBtn").onclick = ()=>{ state.reviewMode=false; state.screen="section"; state.sectionIndex=0; render(); };
+  document.getElementById("retakeBtn").onclick = ()=>{ state.reviewMode=false; state.screen="sectionContent"; state.sectionIndex=0; render(); };
 }
 window.goToReviewSection = function(i){
   state.sectionIndex = i;
-  state.screen = "section";
+  state.screen = "sectionContent";
   state.reviewOnly = true;
   render();
 };
 
-function renderSection(){
+function sectionNavHtml(activeIndex, currentPageIsQuiz){
+  return SECTIONS.map((sec,i)=>{
+    let cls = "section-pill";
+    if(state.sectionResults[sec.key]) cls += " done";
+    if(i === activeIndex) cls += " active";
+    return `<span class="${cls}">${i+1}. ${sec.key}</span>`;
+  }).join("");
+}
+
+function renderSectionContent(){
   const s = SECTIONS[state.sectionIndex];
   const card = document.createElement("div");
   card.className = "card";
 
   const pct = Math.round(((state.sectionIndex)/SECTIONS.length)*100);
-  const nav = SECTIONS.map((sec,i)=>{
-    let cls = "section-pill";
-    if(state.sectionResults[sec.key]) cls += " done";
-    if(i === state.sectionIndex) cls += " active";
-    return `<span class="${cls}">${i+1}. ${sec.key}</span>`;
-  }).join("");
-
   const refBtns = docsByIds(s.refs).map(d =>
     `<button class="btn-ref" onclick="openDoc('${d.id}')">📄 ${d.label}</button>`
   ).join("");
 
   card.innerHTML = `
     ${state.reviewOnly ? "" : `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`}
-    <div class="section-nav">${nav}</div>
+    <div class="section-nav">${sectionNavHtml(state.sectionIndex)}</div>
     <h2>${s.title}</h2>
     <div>${refBtns}</div>
-    <div style="margin-top:16px;">${s.content}</div>
-    <div id="quizArea" style="margin-top:24px;"></div>
-    <div class="no-print" style="margin-top:20px;display:flex;gap:10px;">
-      ${state.reviewOnly ? `<button class="btn-secondary" onclick="backToReviewHome()">Back to sections</button>` : ""}
+    <div id="sectionContentBody" style="margin-top:16px;">${s.content}</div>
+    <div class="no-print" style="margin-top:24px;display:flex;gap:10px;">
+      ${state.reviewOnly
+        ? `<button class="btn-secondary" onclick="backToReviewHome()">Back to sections</button>`
+        : `<button class="btn-primary" id="toQuizBtn">Continue to Knowledge Check →</button>`
+      }
     </div>
   `;
   app.appendChild(card);
 
+  if(s.interactive === "dvom"){
+    renderDvomWidget(document.getElementById("sectionContentBody"));
+  }
+
   if(!state.reviewOnly){
-    renderQuiz(s);
+    document.getElementById("toQuizBtn").onclick = () => {
+      state.screen = "sectionQuiz";
+      render();
+    };
   }
 }
 window.backToReviewHome = function(){ state.screen="reviewHome"; render(); };
+
+function renderSectionQuiz(){
+  const s = SECTIONS[state.sectionIndex];
+  const card = document.createElement("div");
+  card.className = "card";
+
+  const pct = Math.round(((state.sectionIndex + 0.5)/SECTIONS.length)*100);
+
+  card.innerHTML = `
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="section-nav">${sectionNavHtml(state.sectionIndex)}</div>
+    <h2>${s.title} — Knowledge Check</h2>
+    <p class="small">Answer all questions below, then submit. 80% is required to move on.</p>
+    <div id="quizArea" style="margin-top:16px;"></div>
+    <div class="no-print" style="margin-top:16px;">
+      <button class="btn-secondary" id="backToContentBtn">← Back to section content</button>
+    </div>
+  `;
+  app.appendChild(card);
+  document.getElementById("backToContentBtn").onclick = () => { state.screen = "sectionContent"; render(); };
+
+  renderQuiz(s);
+}
 
 function renderQuiz(s){
   const quizArea = document.getElementById("quizArea");
@@ -550,9 +647,10 @@ async function submitQuiz(s){
   document.getElementById("submitQuizBtn").style.display = "none";
 
   document.getElementById("nextBtn").onclick = async () => {
-    if(!passed){ render(); return; }
+    if(!passed){ state.screen = "sectionContent"; render(); return; }
     if(state.sectionIndex < SECTIONS.length - 1){
       state.sectionIndex++;
+      state.screen = "sectionContent";
       render();
     } else {
       await finishCourse();
@@ -611,6 +709,307 @@ window.restartReview = function(){
   state.screen = "reviewHome";
   render();
 };
+
+/* ---------------- DVOM INTERACTIVE WIDGET ---------------- */
+function renderDvomWidget(container){
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "margin-top:10px;";
+  wrap.innerHTML = `
+    <style>
+      .dvom-box{background:#fafcff;border:2px solid #d5dfe8;border-radius:10px;padding:16px;}
+      .dvom-circuit{position:relative;width:100%;max-width:620px;height:260px;margin:10px auto 8px;
+        background:#fff;border:1px solid #ccc;border-radius:8px;touch-action:none;}
+      .dvom-wire{position:absolute;background:#333;}
+      .dvom-label{position:absolute;font-size:.75rem;color:#555;font-weight:600;}
+      .dvom-comp{position:absolute;display:flex;align-items:center;justify-content:center;
+        font-size:.7rem;font-weight:700;color:#fff;text-align:center;border-radius:6px;}
+      .dvom-battery{background:#0b2545;width:56px;height:90px;flex-direction:column;}
+      .dvom-lamp{background:#e8a628;width:60px;height:60px;border-radius:50%;color:#1a1f27;font-size:1.6rem;}
+      .dvom-switch{background:#555;width:70px;height:22px;cursor:pointer;font-size:.65rem;}
+      .dvom-tp{position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;
+        border:2px solid var(--navy);transform:translate(-50%,-50%);font-size:.65rem;
+        display:flex;align-items:center;justify-content:center;color:var(--navy);font-weight:700;}
+      .dvom-tp.filled{background:#cfe8d6;border-color:var(--ok);}
+      .dvom-probe{position:absolute;width:26px;height:26px;border-radius:50% 50% 50% 0;
+        transform:translate(-50%,-100%) rotate(45deg);cursor:grab;z-index:20;
+        display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,.3);}
+      .dvom-probe.red{background:#c23a2e;}
+      .dvom-probe.black{background:#222;}
+      .dvom-probe span{transform:rotate(-45deg);color:#fff;font-size:.6rem;font-weight:700;}
+      .dvom-controls{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:10px;}
+      .dvom-mode-btn{padding:8px 14px;border-radius:6px;border:2px solid var(--blue);background:#fff;color:var(--blue);font-weight:700;cursor:pointer;}
+      .dvom-mode-btn.active{background:var(--blue);color:#fff;}
+      .dvom-toggle{padding:8px 14px;border-radius:6px;border:2px solid #888;background:#fff;cursor:pointer;font-weight:600;}
+      .dvom-toggle.on{border-color:var(--ok);color:var(--ok);}
+      .dvom-toggle.off{border-color:var(--bad);color:var(--bad);}
+      .dvom-meter{margin-top:14px;background:#111;color:#7CFC7C;font-family:'Courier New',monospace;
+        font-size:1.6rem;padding:14px 18px;border-radius:8px;text-align:center;min-height:1.8em;}
+      .dvom-note{margin-top:8px;font-size:.9rem;padding:10px 12px;border-radius:6px;background:#eef4fb;color:var(--navy);}
+      .dvom-note.warn{background:#fdecea;color:var(--bad);font-weight:600;}
+      .dvom-tray{display:flex;gap:40px;justify-content:center;margin-top:6px;}
+    </style>
+    <div class="dvom-box">
+      <div class="dvom-controls">
+        <div>
+          <b>Meter function:</b>
+          <button class="dvom-mode-btn active" data-mode="V">VDC</button>
+          <button class="dvom-mode-btn" data-mode="A">Amps</button>
+          <button class="dvom-mode-btn" data-mode="OHM">Ohms</button>
+        </div>
+        <button class="dvom-toggle on" id="dvomPowerToggle" data-on="1">Circuit power: ON</button>
+        <button class="dvom-toggle on" id="dvomSwitchToggle" data-on="1">Switch: CLOSED</button>
+      </div>
+
+      <div class="dvom-circuit" id="dvomCircuit">
+        <div class="dvom-comp dvom-battery" style="left:20px;top:85px;">
+          <div>+</div><div style="flex:1;"></div><div>12V<br>BATTERY</div><div style="flex:1;"></div><div>−</div>
+        </div>
+        <!-- wires -->
+        <div class="dvom-wire" style="left:47px;top:40px;width:3px;height:45px;"></div>
+        <div class="dvom-wire" style="left:47px;top:40px;width:150px;height:3px;"></div>
+        <div class="dvom-wire" style="left:265px;top:40px;width:130px;height:3px;"></div>
+        <div class="dvom-wire" style="left:393px;top:40px;width:3px;height:80px;"></div>
+        <div class="dvom-wire" style="left:47px;top:215px;width:349px;height:3px;"></div>
+        <div class="dvom-wire" style="left:47px;top:175px;width:3px;height:40px;"></div>
+
+        <!-- switch -->
+        <div class="dvom-comp dvom-switch" id="dvomSwitchIcon" style="left:195px;top:29px;">SWITCH</div>
+
+        <!-- lamp -->
+        <div class="dvom-comp dvom-lamp" style="left:363px;top:10px;">💡</div>
+        <div class="dvom-label" style="left:363px;top:72px;">LAMP (LOAD)<br>4Ω rated</div>
+
+        <!-- test points -->
+        <div class="dvom-tp" data-point="A" style="left:47px;top:70px;">A</div>
+        <div class="dvom-tp" data-point="B" style="left:330px;top:41px;">B</div>
+        <div class="dvom-tp" data-point="C" style="left:394px;top:130px;">C</div>
+        <div class="dvom-tp" data-point="D" style="left:47px;top:190px;">D</div>
+
+        <!-- probes (positioned via JS) -->
+        <div class="dvom-probe red" id="dvomProbeRed"><span>V/Ω/A</span></div>
+        <div class="dvom-probe black" id="dvomProbeBlack"><span>COM</span></div>
+      </div>
+      <div class="dvom-tray small" style="text-align:center;">Drag the probes above onto test points A–D. Red = V/Ω/A lead, Black = COM (ground) lead.</div>
+
+      <div class="dvom-meter" id="dvomMeterDisplay">-- . -</div>
+      <div class="dvom-note" id="dvomNote">Select a meter function and drag both probes onto test points to take a reading.</div>
+    </div>
+  `;
+  container.appendChild(wrap);
+  initDvomWidget(wrap);
+}
+
+function initDvomWidget(root){
+  const circuit = root.querySelector("#dvomCircuit");
+  const tps = Array.from(root.querySelectorAll(".dvom-tp"));
+  const probeRed = root.querySelector("#dvomProbeRed");
+  const probeBlack = root.querySelector("#dvomProbeBlack");
+  const meterDisplay = root.querySelector("#dvomMeterDisplay");
+  const noteEl = root.querySelector("#dvomNote");
+  const powerBtn = root.querySelector("#dvomPowerToggle");
+  const switchBtn = root.querySelector("#dvomSwitchToggle");
+  const switchIcon = root.querySelector("#dvomSwitchIcon");
+  const modeBtns = Array.from(root.querySelectorAll(".dvom-mode-btn"));
+
+  let mode = "V";
+  let powerOn = true;
+  let switchClosed = true;
+  const assign = { red: null, black: null };
+
+  // starting tray positions (below the circuit, inside container coordinate space)
+  const trayPositions = {
+    red: { left: 220, top: 250 },
+    black: { left: 400, top: 250 }
+  };
+
+  function placeProbe(el, left, top){
+    el.style.left = left + "px";
+    el.style.top = top + "px";
+  }
+  placeProbe(probeRed, trayPositions.red.left, trayPositions.red.top);
+  placeProbe(probeBlack, trayPositions.black.left, trayPositions.black.top);
+
+  function nodeVoltage(node){
+    if(!powerOn) return 0;
+    if(node === "A") return 12;
+    if(node === "D") return 0;
+    if(node === "C") return 0;
+    if(node === "B") return switchClosed ? 12 : 0;
+  }
+
+  function resistanceBetween(p1, p2){
+    const key = [p1,p2].sort().join("");
+    const OL = Infinity;
+    const table = {
+      "AB": switchClosed ? 0 : OL,
+      "BC": 4,
+      "CD": 0,
+      "AC": switchClosed ? 4 : OL,
+      "BD": 4,
+      "AD": switchClosed ? 4 : OL
+    };
+    return table[key];
+  }
+
+  function updateModeButtons(){
+    modeBtns.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  }
+  modeBtns.forEach(b => b.onclick = () => { mode = b.dataset.mode; updateModeButtons(); evaluate(); });
+
+  powerBtn.onclick = () => {
+    powerOn = !powerOn;
+    powerBtn.textContent = "Circuit power: " + (powerOn ? "ON" : "OFF");
+    powerBtn.className = "dvom-toggle " + (powerOn ? "on" : "off");
+    evaluate();
+  };
+  switchBtn.onclick = () => {
+    switchClosed = !switchClosed;
+    switchBtn.textContent = "Switch: " + (switchClosed ? "CLOSED" : "OPEN");
+    switchBtn.className = "dvom-toggle " + (switchClosed ? "on" : "off");
+    switchIcon.style.background = switchClosed ? "#2e7d4f" : "#888";
+    switchIcon.textContent = switchClosed ? "SWITCH (closed)" : "SWITCH (open)";
+    evaluate();
+  };
+
+  function nearestTestPoint(clientX, clientY){
+    const rect = circuit.getBoundingClientRect();
+    let best = null, bestDist = 26; // px snap threshold
+    tps.forEach(tp => {
+      const tRect = tp.getBoundingClientRect();
+      const tx = tRect.left + tRect.width/2, ty = tRect.top + tRect.height/2;
+      const d = Math.hypot(clientX - tx, clientY - ty);
+      if(d < bestDist){ bestDist = d; best = tp; }
+    });
+    return best;
+  }
+
+  function makeDraggable(el, colorKey){
+    el.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      const rect = circuit.getBoundingClientRect();
+
+      function onMove(ev){
+        const left = ev.clientX - rect.left;
+        const top = ev.clientY - rect.top;
+        placeProbe(el, left, top);
+      }
+      function onUp(ev){
+        el.removeEventListener("pointermove", onMove);
+        el.removeEventListener("pointerup", onUp);
+        const tp = nearestTestPoint(ev.clientX, ev.clientY);
+        tps.forEach(t => t.classList.remove("filled"));
+        if(tp){
+          const tRect = tp.getBoundingClientRect();
+          placeProbe(el, tRect.left - rect.left + tRect.width/2, tRect.top - rect.top + tRect.height/2);
+          assign[colorKey] = tp.dataset.point;
+          tp.classList.add("filled");
+        } else {
+          placeProbe(el, trayPositions[colorKey].left, trayPositions[colorKey].top);
+          assign[colorKey] = null;
+        }
+        // re-mark filled for the other probe's point too
+        const otherKey = colorKey === "red" ? "black" : "red";
+        if(assign[otherKey]){
+          const otherTp = tps.find(t => t.dataset.point === assign[otherKey]);
+          if(otherTp) otherTp.classList.add("filled");
+        }
+        evaluate();
+      }
+      el.addEventListener("pointermove", onMove);
+      el.addEventListener("pointerup", onUp);
+    });
+  }
+  makeDraggable(probeRed, "red");
+  makeDraggable(probeBlack, "black");
+
+  function setNote(text, isWarn){
+    noteEl.textContent = text;
+    noteEl.className = "dvom-note" + (isWarn ? " warn" : "");
+  }
+
+  function evaluate(){
+    const p1 = assign.red, p2 = assign.black;
+    if(!p1 || !p2){
+      meterDisplay.textContent = "-- . -";
+      setNote("Select a meter function and drag both probes onto test points to take a reading.", false);
+      return;
+    }
+    if(p1 === p2){
+      meterDisplay.textContent = "0.0";
+      setNote("Both probes are on the same point — no difference to measure. Try two different test points.", false);
+      return;
+    }
+
+    if(mode === "V"){
+      const v = Math.abs(nodeVoltage(p1) - nodeVoltage(p2));
+      meterDisplay.textContent = v.toFixed(1) + " V";
+      if(!powerOn){
+        setNote("Circuit power is off, so there's no voltage anywhere in the circuit.", false);
+      } else {
+        const pair = [p1,p2].sort().join("");
+        let note = "Voltage reading between " + p1 + " and " + p2 + ".";
+        if(pair === "AB") note = switchClosed
+          ? "0.0V across a CLOSED switch — a good switch has no voltage drop."
+          : "12.0V across an OPEN switch — full battery voltage appears across an open point in the circuit. Classic sign of an open switch or connection.";
+        if(pair === "BC") note = switchClosed
+          ? "12.0V across the lamp — this is where the electrical energy is being used to do work (light the lamp)."
+          : "0.0V across the lamp — no current is flowing (switch open), so there's nothing for the lamp to drop.";
+        if(pair === "CD") note = "0.0V across plain wire — good wire has essentially no resistance, so no voltage drop.";
+        if(pair === "AD") note = "12.0V — full battery/source voltage measured across the whole circuit.";
+        setNote(note, false);
+      }
+    } else if(mode === "OHM"){
+      if(powerOn){
+        meterDisplay.textContent = "-OL-";
+        setNote("⚠ Never measure resistance on an energized circuit — turn circuit power OFF first, or you can damage the meter and get a false reading.", true);
+        return;
+      }
+      const r = resistanceBetween(p1, p2);
+      if(r === Infinity){
+        meterDisplay.textContent = "O.L";
+        setNote("Open circuit (infinite resistance) — with the switch open, there's no continuous path between these points. This is exactly how you'd find an open switch or a broken wire.", false);
+      } else {
+        meterDisplay.textContent = r.toFixed(1) + " Ω";
+        const pair = [p1,p2].sort().join("");
+        let note = "Resistance reading between " + p1 + " and " + p2 + ".";
+        if(pair === "AB") note = "0.0Ω — a closed switch reads as continuity (near-zero resistance).";
+        if(pair === "BC") note = "4.0Ω — this is the lamp's own resistance.";
+        if(pair === "CD") note = "0.0Ω — plain wire, essentially no resistance.";
+        if(pair === "AD" || pair === "AC") note = "Total resistance through the switch and lamp in this path.";
+        setNote(note, false);
+      }
+    } else if(mode === "A"){
+      if(!powerOn){
+        setNote("Circuit power is off, so no current is flowing — there's nothing to measure yet. Turn power on, then remember: an ammeter must be placed IN SERIES (broken into the circuit path), never across two points.", false);
+        meterDisplay.textContent = "0.0 A";
+        return;
+      }
+      meterDisplay.textContent = "-FUSE-";
+      setNote("⚠ Blown fuse! You connected the meter across two points like a voltmeter while set to Amps. An ammeter has almost no resistance, so bridging two points this way creates a dead short. To measure current, you must break the circuit open and put the meter IN SERIES with the current path.", true);
+    }
+  }
+
+  updateModeButtons();
+  evaluate();
+
+  // Reposition probes correctly if the window resizes (keeps them anchored to their point/tray).
+  window.addEventListener("resize", () => {
+    ["red","black"].forEach(key => {
+      const el = key === "red" ? probeRed : probeBlack;
+      if(assign[key]){
+        const tp = tps.find(t => t.dataset.point === assign[key]);
+        if(tp){
+          const rect = circuit.getBoundingClientRect();
+          const tRect = tp.getBoundingClientRect();
+          placeProbe(el, tRect.left - rect.left + tRect.width/2, tRect.top - rect.top + tRect.height/2);
+          return;
+        }
+      }
+      placeProbe(el, trayPositions[key].left, trayPositions[key].top);
+    });
+  });
+}
 
 /* ---------------- DOC VIEWER ---------------- */
 window.openDoc = function(id){
