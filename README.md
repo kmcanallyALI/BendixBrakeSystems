@@ -1,14 +1,20 @@
-# Bendix EC-80 / Fusion Troubleshooting Training
+# Bendix ESP EC-80 / Fusion Troubleshooting Training
 
 Browser-based training course for Andrews Logistics technicians, covering
-troubleshooting of the Bendix EC-80 ABS/ATC/ESP controller family and the
-Bendix Fusion driver-assistance system (FLC-25 camera / FLR-25 radar).
+troubleshooting of the **Bendix ESP EC-80 controller** (the tier equipped on
+Andrews units) and the Bendix Fusion driver-assistance system (FLC-25 camera /
+FLR-25 radar). Course content is deliberately built from the ESP service data
+sheet rather than the base ABS/ATC sheet, since ABS/ATC-only controllers are
+not what's on our fleet.
 
 ## What's in this repo
 
 - `index.html` — the whole course (content, quizzes, certificate, reference viewer)
-- `docs/` — the four source Bendix service data PDFs, opened in-page via each
-  section's "Reference Documents" buttons
+- `docs/` — the four source Bendix service data PDFs. `EC-80_ESP.pdf` is the
+  primary reference used throughout the course; `EC-80_ABS-ATC.pdf` is kept in
+  the library only as background reading (labeled as such in the reference
+  picker) since it's not the controller tier on our trucks. All four are
+  opened in-page via each section's "Reference Documents" buttons.
 - `netlify/functions/check-name.js` — looks up a trainee's name in the results
   log; if they already passed, the course opens straight into **reference mode**
 - `netlify/functions/record-result.js` — appends a completion record to

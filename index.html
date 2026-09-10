@@ -80,10 +80,10 @@ const RESULTS_ENDPOINT_RECORD = "/.netlify/functions/record-result";
 const PASS_THRESHOLD = 0.8;
 
 const REFERENCE_DOCS = [
-  {id:"abs-atc", label:"EC-80 ABS/ATC Service Data (SD-13-4983)", file:"docs/EC-80_ABS-ATC.pdf"},
   {id:"esp", label:"EC-80 ESP Service Data (SD-13-4986)", file:"docs/EC-80_ESP.pdf"},
   {id:"camera", label:"FLC-25 Camera Service Data (SD-29-50024)", file:"docs/FLC25_Camera.pdf"},
-  {id:"radar", label:"FLR-25 Radar Service Data (SD-29-50022)", file:"docs/FLR25_Radar.pdf"}
+  {id:"radar", label:"FLR-25 Radar Service Data (SD-29-50022)", file:"docs/FLR25_Radar.pdf"},
+  {id:"abs-atc", label:"EC-80 ABS/ATC Service Data (SD-13-4983) — background reference only, not the system on Andrews units", file:"docs/EC-80_ABS-ATC.pdf"}
 ];
 
 function docsByIds(ids){ return REFERENCE_DOCS.filter(d => ids.includes(d.id)); }
@@ -92,87 +92,143 @@ function docsByIds(ids){ return REFERENCE_DOCS.filter(d => ids.includes(d.id)); 
 const SECTIONS = [
 {
   key:"power",
-  title:"1. Power Supply & System Basics",
-  refs:["abs-atc","esp"],
+  title:"1. Power Supply & ESP System Basics",
+  refs:["esp"],
   content:`
-    <p>Every Bendix EC-80 diagnosis starts with the power supply and a clear picture of which controller tier
-    you're working on. The EC-80 family has three tiers: <b>ABS</b> (standard, two connectors), <b>ATC</b>
-    (adds traction control, three connectors), and <b>ESP</b> (adds full stability control, four connectors).</p>
-    <div class="fact-box"><b>Operating voltage range:</b> 9.0–17.0 VDC. Outside this range, ABS and ATC are
-    disabled and the system reverts to normal braking until voltage is restored.</div>
+    <p>Andrews units are equipped with the <b>Bendix ESP EC-80</b> controller — the top tier of the EC-80
+    family, adding Yaw Control (YC) and Roll Stability Program (RSP) on top of standard ABS and ATC. It uses
+    <b>four</b> wire harness connectors (X1–X4), where X4 carries the stability sensors: Steering Angle
+    Sensor (SAS), Yaw Rate/Lateral Acceleration Sensor (YRS/LAS), ABS Pressure Sensors, and ABS Air Bag
+    Pressure Sensor.</p>
+    <div class="fact-box"><b>Operating voltage range:</b> 9.0–17.0 VDC on 12-volt systems, and
+    20–33.5 VDC on 24-volt systems. Outside these ranges, ABS, ATC, and ESP are all disabled and the
+    vehicle reverts to normal braking until voltage is restored.</div>
     <table>
       <tr><th>Test</th><th>Spec</th></tr>
-      <tr><td>Ignition-to-Ground (under load)</td><td>9–17 VDC</td></tr>
-      <tr><td>Battery-to-Ground (under load)</td><td>9–17 VDC</td></tr>
+      <tr><td>Ignition/Battery-to-Ground (under load, 12V system)</td><td>9–17 VDC</td></tr>
+      <tr><td>Ignition/Battery-to-Ground (under load, 24V system)</td><td>20–33.5 VDC</td></tr>
       <tr><td>FLC-25 camera supply (pin 7 to ground, under load)</td><td>10–16 VDC</td></tr>
       <tr><td>FLR-25 radar supply (pin 1 to ground pin 8, under load)</td><td>10–16 VDC</td></tr>
     </table>
-    <p>Always load the circuit (e.g., an 1157 stop lamp) across the supply and ground before measuring —
-    an unloaded reading can look fine while the circuit fails under real current draw.</p>
-    <div class="warn-box"><b>Fusion system dependency:</b> the Fusion system (radar + camera + ESP EC-80)
-    will not operate — and will set its own DTC — if the engine, engine cruise, instrument cluster,
-    transmission, or ABS/ATC/ESP already has an active DTC. Always clear vehicle-level DTCs first;
-    that alone often restores full Fusion functionality.</div>
+    <div class="warn-box"><b>ESP controllers are parameter-matched to the vehicle.</b> When replacing an
+    ESP EC-80 controller, only a Controller with the correct validated parameter set may be used — you
+    cannot simply swap in any EC-80 unit. If the vehicle's chassis has been modified (wheelbase change, axle
+    addition/removal, major body change, steering/suspension changes), the ESP system must be disabled and
+    the ESP EC-80 Controller replaced with an <b>ESP ATC EC-80 Controller</b> by a qualified mechanic, with
+    the now-unused X4 connector secured and all ESP-related cab signage removed. Running ESP disabled but
+    unmarked risks a driver assuming stability protection is active when it isn't.</div>
+    <p>Fusion system dependency still applies: the Fusion system (radar + camera + ESP EC-80) will not
+    operate — and will set its own DTC — if the engine, engine cruise, instrument cluster, transmission, or
+    ABS/ATC/ESP already has an active DTC. Clear vehicle-level DTCs first.</p>
   `,
   quiz:[
-    {q:"What is the normal operating voltage range for an EC-80 controller?",
-     opts:["6.0–12.0 VDC","9.0–17.0 VDC","12.0–24.0 VDC","5.0–9.0 VDC"], a:1},
-    {q:"When performing a power supply test, why should you place a load (like an 1157 stop lamp) across the circuit?",
-     opts:["To brighten the dash lamp","To verify voltage holds up under real current draw, not just at no load","It is required by FMVSS-121","To discharge stored air pressure"], a:1},
-    {q:"If a Fusion system DTC won't clear, what should you check first?",
-     opts:["Replace the radar immediately","Check for active DTCs on engine, transmission, instrument cluster, or ABS/ATC/ESP and resolve those first","Recalibrate the camera","Replace the ECU"], a:1},
-    {q:"How many connectors does an EC-80 ATC controller use?",
-     opts:["Two","Three","Four","Six"], a:1},
-    {q:"What happens to ABS/ATC function when supply voltage goes out of the 9–17 VDC range?",
-     opts:["Nothing changes","ABS and ATC are disabled and the vehicle reverts to normal braking until voltage is restored","The vehicle shuts down","ATC switches to off-road mode"], a:1}
+    {q:"What is the normal 12-volt operating voltage range for the ESP EC-80 controller?",
+     opts:["6.0–12.0 VDC","9.0–17.0 VDC","20–33.5 VDC","5.0–9.0 VDC"], a:1},
+    {q:"What is the operating voltage range for a 24-volt ESP EC-80 system?",
+     opts:["9.0–17.0 VDC","18–24 VDC","20–33.5 VDC","30–40 VDC"], a:2},
+    {q:"How many wire harness connectors does the ESP EC-80 controller use, and what does the extra one (X4) carry?",
+     opts:["Two; nothing extra","Three; the trailer ABS lamp","Four; the stability sensors (SAS, YRS/LAS, ABS pressure sensors)","Five; the engine ECU link"], a:2},
+    {q:"If a vehicle's chassis is significantly modified (e.g., wheelbase change), what must happen to the ESP system?",
+     opts:["Nothing, ESP adapts automatically","ESP must be disabled and the controller replaced with an ESP ATC EC-80 Controller, with cab signage updated","Only the tires need to be recalibrated","The radar must be removed"], a:1},
+    {q:"Can any EC-80 controller be used as a replacement on an ESP-equipped vehicle?",
+     opts:["Yes, any EC-80 controller works","No — only a Controller with the correct validated parameter set for that vehicle may be used","Yes, as long as it has four connectors","Only if it's a 12-volt unit"], a:1}
   ]
 },
 {
   key:"wss-pmv",
-  title:"2. Wheel Speed Sensors, PMVs & Traction Valves",
-  refs:["abs-atc"],
+  title:"2. Wheel Speed Sensors, PMVs & Traction/Stability Valves",
+  refs:["esp"],
   content:`
-    <p>Wheel speed sensor (WSS) and pressure modulator valve (PMV) faults are the most common EC-80 DTCs.
-    Both have simple resistance checks that should be your first move before condemning a part.</p>
+    <p>Wheel speed sensor (WSS) and pressure modulator valve (PMV) checks are the same starting point on ESP
+    units as on any EC-80 system — simple resistance checks before condemning a part.</p>
     <table>
       <tr><th>Component</th><th>Measurement</th><th>Spec</th></tr>
       <tr><td>WSS, sensor leads</td><td>Resistance</td><td>1500–2500 Ω</td></tr>
-      <tr><td>WSS, sensor to voltage/ground</td><td>Continuity</td><td>Open circuit (none)</td></tr>
       <tr><td>WSS output</td><td>AC voltage @ ~0.5 rev/sec</td><td>&gt;0.25 VAC</td></tr>
-      <tr><td>PMV Release–Common</td><td>Resistance</td><td>4.9–5.5 Ω</td></tr>
-      <tr><td>PMV Hold–Common</td><td>Resistance</td><td>4.9–5.5 Ω</td></tr>
+      <tr><td>PMV Release–Common / Hold–Common</td><td>Resistance</td><td>4.9–5.5 Ω</td></tr>
       <tr><td>PMV Release–Hold</td><td>Resistance</td><td>9.8–11.0 Ω</td></tr>
       <tr><td>TCV to TCV Common</td><td>Resistance</td><td>7–19 Ω</td></tr>
     </table>
-    <div class="fact-box"><b>Chuff Test:</b> With brake pressure applied, a correctly wired PMV performs one
-    sharp exhaust (hold solenoid twice, release once). Two exhausts, or none, means incorrect wiring. The
-    ECU tests PMVs in a fixed order: Steer Right → Steer Left → Drive Right → Drive Left → Additional Right
-    → Additional Left — and will not run the test while the vehicle is moving.</div>
-    <p>Acceptable tire size (100-tooth exciter ring): 426–567 revolutions/mile (default 510). Outside that
-    range, the ECU sets a tire size calibration DTC.</p>
+    <div class="fact-box"><b>Tire size calibration (ESP systems, 100-tooth exciter ring):</b> acceptable
+    range is <b>376–665</b> revolutions/mile (default 510). The steer-axle-to-drive-axle effective rolling
+    circumference ratio must stay between <b>0.85 and 1.15</b>. If tires are changed enough to require an
+    odometer correction, the ECU's tire size setting must also be reprogrammed — the ESP system's
+    effectiveness depends on accurate vehicle speed.</div>
+    <p>Automatic calibration only updates when: the ratio is in range, vehicle speed is above ~12 mph,
+    there's no acceleration/deceleration, and there are no active WSS DTCs.</p>
+    <div class="warn-box"><b>DTC hierarchy — what stays active:</b> a Steer Axle ABS Modulator DTC disables
+    ESP entirely (ABS/ATC keep working on unaffected wheels). A Drive/Additional Axle ABS Modulator or WSS
+    DTC disables ATC and ESP but keeps ABS active on unaffected wheels. An ECU or Voltage DTC disables ABS,
+    ATC, and ESP together, reverting to normal braking.</div>
   `,
   quiz:[
+    {q:"For an ESP-equipped vehicle with a 100-tooth exciter ring, what is the acceptable tire revolutions-per-mile range?",
+     opts:["100–200","300–425","376–665","700–800"], a:2},
+    {q:"What is the acceptable steer-axle-to-drive-axle rolling circumference ratio range?",
+     opts:["0.50–1.50","0.85–1.15","1.0 exactly, no tolerance","2.0–3.0"], a:1},
+    {q:"If a Steer Axle ABS Modulator DTC sets, what happens to ESP?",
+     opts:["Nothing, ESP is unaffected","ESP is disabled; ABS/ATC remain active on unaffected wheels","The whole vehicle shuts down","Only the trailer brakes are affected"], a:1},
     {q:"What resistance should you expect across a wheel speed sensor's leads?",
      opts:["0–10 Ω","1500–2500 Ω","4.9–5.5 Ω","9.8–11.0 Ω"], a:1},
-    {q:"During a correctly-wired PMV chuff test, how many exhausts of air should occur?",
-     opts:["Zero","One sharp exhaust","Two exhausts","Continuous exhaust"], a:1},
-    {q:"What does the ECU do if PMV wiring is incorrect during the chuff test?",
-     opts:["Nothing, it ignores it","Produces two exhausts of air, or none at all","Sets the parking brake","Disables the engine"], a:1},
-    {q:"What is the acceptable tire revolutions-per-mile range for a 100-tooth exciter ring?",
-     opts:["100–200","300–425","426–567","600–700"], a:2},
-    {q:"What is the correct chuff-test firing order?",
-     opts:["Drive axles first, then steer axles","Steer Right, Steer Left, Drive Right, Drive Left, Additional Right, Additional Left","Random order each time","Left side, then right side"], a:1},
-    {q:"The ECU will NOT perform a PMV chuff test when:",
-     opts:["The parking brake is set","Wheel speed sensors show the vehicle is in motion","The ignition is off","ATC is disabled"], a:1}
+    {q:"What conditions must be met for the ECU to update its automatic tire size calibration?",
+     opts:["Vehicle stopped with engine off","Ratio in range, speed above ~12 mph, no accel/decel, and no active WSS DTCs","Only during a blink code session","Anytime the ignition is cycled"], a:1},
+    {q:"An ECU-level DTC or a voltage-out-of-range DTC affects which systems?",
+     opts:["Only ESP","Only the radar","ABS, ATC, and ESP together — the vehicle reverts to normal braking","Only the trailer ABS lamp"], a:2}
+  ]
+},
+{
+  key:"stability",
+  title:"3. Stability Sensors: SAS, Yaw Rate/Lateral Accel & ABS Pressure",
+  refs:["esp"],
+  content:`
+    <p>This section is unique to ESP-equipped units — these sensors don't exist on plain ABS or ATC
+    controllers. They're what make Yaw Control and Roll Stability Program possible.</p>
+    <table>
+      <tr><th>Sensor</th><th>Purpose</th><th>Calibration tool</th></tr>
+      <tr><td>Steering Angle Sensor (SAS-60/SAS-70X)</td><td>Reads driver steering input, cross-checked against yaw rate</td><td>Bendix ACom (System Checks → Stability System Checks → Steering Angle Calibration)</td></tr>
+      <tr><td>Yaw Rate / Lateral Accel Sensor (YAS-60/YAS-70X)</td><td>Measures rotation about the vertical axis and lateral acceleration</td><td>Bendix ACom only</td></tr>
+      <tr><td>ABS Pressure Sensors</td><td>Primary/secondary delivery circuit pressure</td><td>Bendix ACom (no calibration needed once installed correctly)</td></tr>
+      <tr><td>ABS Air Bag Pressure Sensor</td><td>Suspension air bag pressure, used for load-based stability calculations</td><td>Bendix ACom</td></tr>
+    </table>
+    <div class="warn-box"><b>Recalibrate the SAS any time</b> you perform maintenance on the steering
+    mechanism, linkage, steering gear, wheel track adjustment, or replace the sensor itself — and don't
+    alter its mounting location or orientation. If the SAS isn't recalibrated, yaw control may not function
+    properly, which can lead to loss of vehicle control.</div>
+    <p>Quick electrical checks at the X4 connector (SAS/YRS, ignition on — voltage is only present
+    momentarily at key-on):</p>
+    <ul>
+      <li>SAS pins 3 &amp; 4: ~120 Ω</li>
+      <li>With SAS and YRS both plugged in, ECU pins 7 &amp; 8: ~60 Ω</li>
+      <li>SAS terminal 4/3 to voltage &amp; ground: open circuit (no continuity) expected</li>
+    </ul>
+    <div class="fact-box"><b>DTC 10 — SAS Plausibility Check:</b> the ECU compares the SAS signal against
+    the Yaw Rate Sensor signal — the two should track together, not oppose one another. If they disagree,
+    monitor both live in ACom before condemning either sensor.</div>
+    <p>A SAS or YRS/LAS DTC disables the ESP function only — ABS and ATC remain fully active. Same for an
+    ABS Pressure Sensor or ABS Air Bag Pressure Sensor DTC.</p>
+  `,
+  quiz:[
+    {q:"Which sensor is unique to ESP-tier EC-80 controllers and not present on plain ABS or ATC systems?",
+     opts:["Wheel speed sensor","Steering Angle Sensor / Yaw Rate Sensor","Pressure modulator valve","Battery voltage sensor"], a:1},
+    {q:"When must the Steering Angle Sensor be recalibrated?",
+     opts:["Never, it's maintenance-free","Any time steering mechanism, linkage, steering gear, or wheel track work is performed, or the sensor is replaced","Only once a year","Only after a tire rotation"], a:1},
+    {q:"What tool is required to calibrate the SAS and YRS?",
+     opts:["A basic multimeter only","Bendix ACom Diagnostic Software","A torque wrench","The blink code switch alone"], a:1},
+    {q:"What does DTC code 10 (SAS Plausibility Check) indicate?",
+     opts:["A blown fuse","The SAS signal disagrees with the Yaw Rate Sensor signal — they should track together","The tires are the wrong size","J1939 is disconnected"], a:1},
+    {q:"If a Yaw Rate/Lateral Acceleration Sensor DTC sets, what happens to ABS and ATC?",
+     opts:["They are also disabled","They remain fully active — only ESP is disabled","The vehicle won't start","They switch to off-road mode"], a:1},
+    {q:"What should you check before condemning the SAS or YRS if a plausibility DTC is active?",
+     opts:["Replace both sensors immediately","Monitor both sensors' live data in ACom — their signals should track together, not oppose each other","Check tire pressure","Nothing further is needed"], a:1}
   ]
 },
 {
   key:"j1939-blink",
-  title:"3. J1939 Communications & Blink Code Diagnostics",
-  refs:["abs-atc"],
+  title:"4. J1939 Communications & Blink Code Diagnostics",
+  refs:["esp"],
   content:`
-    <p>Blink codes let you troubleshoot without a laptop. The ABS indicator lamp blinks two-digit code groups;
-    record each group and look it up in the DTC index.</p>
+    <p>Blink codes let you troubleshoot without a laptop. The ABS indicator lamp blinks two-digit code
+    groups; record each group and look it up in the DTC index.</p>
     <table>
       <tr><th>Switch presses</th><th>Mode entered</th></tr>
       <tr><td>1</td><td>Active DTC retrieval</td></tr>
@@ -182,38 +238,43 @@ const SECTIONS = [
       <tr><td>5</td><td>Dynamometer Test Mode</td></tr>
       <tr><td>7 (held before power-up)</td><td>Reconfigure ECU</td></tr>
     </table>
-    <div class="fact-box"><b>Timing:</b> half-second blinks with half-second pauses; 1.5 sec between digits;
-    2.5 sec between messages; lamp stays on 5 seconds at the end. The ECU will not enter blink code mode if
-    wheel speed sensors indicate the vehicle is moving, and will exit blink code mode if motion begins.</div>
+    <div class="fact-box"><b>System Configuration Check on ESP units is a 7-digit sequence</b> (one digit
+    longer than plain ABS/ATC controllers), because it includes a 7th number for Stability Configuration:
+    <b>1 = No Stability Program, 2 = Electronic Stability Program (ESP)</b>. The other six digits cover
+    system voltage, wheel speed sensor count, PMV count, ABS configuration, traction control configuration,
+    and retarder configuration, in that order.</div>
+    <div class="warn-box"><b>Dynamometer Test Mode on ESP units disables more than on plain ABS/ATC:</b> it
+    turns off ATC brake control, ATC engine control, drag torque control, <i>and</i> the full ESP system —
+    and it stays engaged even through a power cycle. Exit it with 3 presses of the blink switch or a
+    diagnostic tool. Power must also be disconnected from the radar sensor during any dyno test on a
+    Fusion/Wingman-equipped vehicle.</div>
     <p>J1939 wiring: J1939 Low and J1939 High must never be shorted together or reversed — either fault can
     take down the whole serial link, sometimes intermittently, logging multiple DTCs across several
     controllers at once.</p>
-    <div class="warn-box"><b>Dynamometer testing:</b> ATC/ESP must be disabled before any dyno work, and
-    power must be disconnected from the radar sensor whenever a dynamometer test is run on a Wingman/Fusion
-    equipped vehicle.</div>
   `,
   quiz:[
-    {q:"How many times do you press the blink code switch to enter Active DTC retrieval mode?",
-     opts:["1","3","5","7"], a:0},
-    {q:"How many times do you press the switch to clear active DTCs?",
+    {q:"How many digits does the System Configuration Check blink sequence use on an ESP-equipped controller?",
+     opts:["Five","Six","Seven","Ten"], a:2},
+    {q:"What does the 7th digit of the ESP System Configuration Check represent?",
+     opts:["Retarder configuration","Stability configuration (1 = none, 2 = ESP)","Tire size","Battery voltage"], a:1},
+    {q:"On an ESP-equipped controller, what does Dynamometer Test Mode disable?",
+     opts:["Only the radio","ATC brake/engine control, drag torque control, and the full ESP system","Only the headlights","Nothing, it's informational only"], a:1},
+    {q:"How many times do you press the blink code switch to clear active DTCs?",
      opts:["1","2","3","4"], a:2},
-    {q:"What is the pause between blink code digits?",
-     opts:["0.5 seconds","1.5 seconds","2.5 seconds","5 seconds"], a:1},
-    {q:"Why won't the ECU enter diagnostic blink code mode in some situations?",
-     opts:["It's raining","Wheel speed sensors show the vehicle is in motion","The battery is low","It's after business hours"], a:1},
-    {q:"What must you disconnect before running a dynamometer test on a Fusion/Wingman-equipped vehicle?",
+    {q:"What must you disconnect before running a dynamometer test on a Fusion/Wingman-equipped ESP vehicle?",
      opts:["The horn","Power to the radar sensor","The parking brake valve","The J1939 backbone entirely"], a:1},
     {q:"What happens to the J1939 link if the High and Low wiring circuits are shorted together?",
-     opts:["Nothing, J1939 is redundant","The entire J1939 link can be lost, sometimes intermittently","Only ATC is affected","The engine shuts off"], a:1}
+     opts:["Nothing, J1939 is redundant","The entire J1939 link can be lost, sometimes intermittently, logging DTCs in multiple controllers","Only ATC is affected","The engine shuts off"], a:1}
   ]
 },
 {
   key:"fusion",
-  title:"4. Fusion System: FLC-25 Camera & FLR-25 Radar",
+  title:"5. Fusion System: FLC-25 Camera & FLR-25 Radar",
   refs:["camera","radar"],
   content:`
-    <p>The Bendix Fusion system combines the FLR-25 radar, FLC-25 camera, and ESP EC-80 controller to deliver
-    AEB, Highway Departure Braking, Active Cruise with Braking, and Overspeed Alert.</p>
+    <p>The Bendix Fusion system pairs the FLR-25 radar and FLC-25 camera with the ESP EC-80 controller to
+    deliver AEB, Highway Departure Braking, Active Cruise with Braking, and Overspeed Alert. Because
+    Andrews units run the ESP tier, Fusion is the expected configuration fleet-wide, not an add-on.</p>
     <table>
       <tr><th>Component</th><th>Connector power pin(s)</th><th>Spec</th></tr>
       <tr><td>FLC-25 camera</td><td>Pin 7 (Module Power) to ground</td><td>10–16 VDC</td></tr>
@@ -232,6 +293,9 @@ const SECTIONS = [
     <p>Common false-troubleshooting trap: a "false brake application" reported by a driver is often actually
     a loss of engine throttle from a J1939 communication failure — frequently caused by aftermarket
     Electronic Driver Logs, GPS, or telematics devices tapped into the CAN line.</p>
+    <p>Remember the dependency chain from Section 1: Fusion will not operate, and will set its own DTC, if
+    the ESP EC-80 controller (or engine, transmission, cruise, or instrument cluster) already has an active
+    DTC. Clear the ESP-tier DTCs first.</p>
   `,
   quiz:[
     {q:"What voltage should you expect at the FLC-25 camera's Module Power pin (pin 7) to ground, under load?",
@@ -240,29 +304,33 @@ const SECTIONS = [
      opts:["Yes, anywhere on the bumper", "No — it must stay in the original OEM location; repositioning requires reprogramming the mounting offset", "Only if it's centered", "Only with a dealer waiver"], a:1},
     {q:"After replacing a camera, how long might calibration take before you should suspect a real fault?",
      opts:["Up to 20 minutes of driving above 25 mph","5 seconds","It calibrates instantly at power-up","Only after a full oil change interval"], a:0},
-    {q:"A driver reports unexplained loss of engine power/throttle they interpreted as a 'false brake event.' What should you suspect first?",
+    {q:"A driver reports unexplained loss of engine power they interpreted as a 'false brake event.' What should you suspect first?",
      opts:["A cracked windshield","A J1939 communication failure, often from an aftermarket EDL, GPS, or telematics device","A flat tire","Low coolant"], a:1},
-    {q:"What is required before the Fusion system will operate normally?",
-     opts:["Nothing else matters as long as the radar is clean","No active DTCs on engine, transmission, instrument cluster, or ABS/ATC/ESP", "A full tank of fuel","The trailer must be unhooked"], a:1}
+    {q:"On an Andrews (ESP-tier) unit, what will block the Fusion system from operating even if the radar and camera are perfectly healthy?",
+     opts:["Cold weather","An active DTC on the ESP EC-80 controller, engine, transmission, cruise, or instrument cluster","Driving over 55 mph","Using cruise control"], a:1}
   ]
 },
 {
   key:"wiring",
-  title:"5. Wiring, Harnesses & Connectors",
-  refs:["abs-atc","camera","radar"],
+  title:"6. Wiring, Harnesses & Connectors",
+  refs:["esp","camera","radar"],
   content:`
-    <p>Most intermittent EC-80 and Fusion faults trace back to connectors and harness routing, not the
-    controller itself.</p>
+    <p>Most intermittent ESP and Fusion faults trace back to connectors and harness routing, not the
+    controller itself — this is even more true on ESP units, which have a fourth connector (X4) and four
+    extra stability-sensor circuits to keep clean.</p>
     <ul>
       <li>All wire harness connectors must be fully seated — push until they click/seal, and use secondary
       locks where provided.</li>
-      <li>Unused ECU connectors must be capped and protected from moisture at all times.</li>
+      <li>Unused ECU connectors (including a secured, no-longer-used X4 on a downgraded ESP-to-ATC
+      controller swap) must be capped and protected from moisture at all times.</li>
       <li>Sensor and J1939 circuits must use twisted-pair wire (1–2 twists per inch).</li>
       <li>Route wires straight out of a connector for at least 3 inches before any bend.</li>
       <li>Secure wiring every 6–12 inches with UV-stabilized, non-metallic clamps or bow-tie ties — never
       standard tie-wraps directly on rubber air lines (pressure cycling can chafe through the wire jacket).</li>
-      <li>Corroded connector terminals on a camera or radar usually mean water intrusion — replace the whole
-      harness; if the component's own terminals are corroded, replace the component.</li>
+      <li>Corroded connector terminals on a camera, radar, SAS, or YRS usually mean water intrusion —
+      replace the whole harness; if the component's own terminals are corroded, replace the component.</li>
+      <li>Never alter the mounting location or orientation of the SAS or Yaw Rate Sensor — if replacement is
+      needed, use an identical part in the same orientation with OEM brackets and torque specs.</li>
     </ul>
     <div class="fact-box"><b>Diagnosis tip:</b> if a DTC clears and instantly comes back after a repair,
     recheck routing near rotating components (wheel ends, drive shafts) and near air line clamps first —
@@ -275,8 +343,8 @@ const SECTIONS = [
      opts:["They look unprofessional","Pressure cycling in the air line can cause premature wiring failure from the pressure exerted","They are more expensive","They interfere with J1939"], a:1},
     {q:"What should sensor and J1939 wiring circuits use?",
      opts:["Solid single-conductor wire","Twisted pair wiring (1–2 twists per inch)","Bare wire","Coaxial cable"], a:1},
-    {q:"If a camera or radar connector's terminals are corroded, what's the recommended action?",
-     opts:["Spray with electrical cleaner and reuse","Replace the harness, and replace the component if its own terminals are corroded","Ignore it if it still connects","Tape over it"], a:1},
+    {q:"If the Steering Angle Sensor or Yaw Rate Sensor needs replacement, what's required?",
+     opts:["Any compatible sensor works in any position","An identical part, in the same orientation, using OEM brackets and torque specs — location/orientation must not be altered","A cheaper aftermarket substitute is preferred","No special care is needed"], a:1},
     {q:"How far should wire be routed straight out of a connector before it's allowed to bend?",
      opts:["At least 3 inches","At least 12 inches","It doesn't matter","6 feet"], a:0}
   ]
@@ -321,9 +389,10 @@ function renderWelcome(){
   card.className = "card";
   card.innerHTML = `
     <h2>Welcome</h2>
-    <p>This course covers troubleshooting the Bendix EC-80 ABS/ATC/ESP controller family and the Bendix
-    Fusion driver-assistance system (FLC-25 camera / FLR-25 radar), organized by troubleshooting topic
-    rather than by document.</p>
+    <p>This course covers troubleshooting the <b>Bendix ESP EC-80</b> controller — the system equipped on
+    Andrews units — and the Bendix Fusion driver-assistance system (FLC-25 camera / FLR-25 radar),
+    organized by troubleshooting topic rather than by document. It is not based on the base ABS/ATC
+    controller, since that's not what's on our fleet.</p>
     <p>Enter your full legal name below. If you've already passed this course, you'll be dropped straight
     into <b>reference mode</b> so you can use it as a lookup tool without retaking the test.</p>
     <label><b>Full legal name</b></label>
