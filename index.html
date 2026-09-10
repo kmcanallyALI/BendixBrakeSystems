@@ -77,7 +77,36 @@
 
 const RESULTS_ENDPOINT_CHECK = "/.netlify/functions/check-name";
 const RESULTS_ENDPOINT_RECORD = "/.netlify/functions/record-result";
+const CERTIFICATE_EMAIL_ENDPOINT = "/.netlify/functions/send-certificate";
 const PASS_THRESHOLD = 0.8;
+const QUIZ_SIZE = 6;          // how many questions are drawn per attempt from each section's pool
+const MIN_READ_SECONDS = 40;  // minimum time on a content page before the knowledge check unlocks
+
+function shuffleArray(arr){
+  const a = arr.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Builds one randomized attempt from a section's question pool: picks a random
+// subset (so repeat attempts and different people don't see an identical quiz),
+// and shuffles each question's answer order (so "the longest option" or
+// "position C" is never a reliable shortcut).
+function buildQuizInstance(pool){
+  const chosen = shuffleArray(pool).slice(0, Math.min(QUIZ_SIZE, pool.length));
+  return chosen.map(q => {
+    const order = shuffleArray(q.opts.map((_, i) => i));
+    return {
+      q: q.q,
+      opts: order.map(i => q.opts[i]),
+      a: order.indexOf(q.a)
+    };
+  });
+}
+
 
 const REFERENCE_DOCS = [
   {id:"esp", label:"EC-80 ESP Service Data (SD-13-4986)", file:"docs/EC-80_ESP.pdf"},
@@ -136,21 +165,25 @@ const SECTIONS = [
   `,
   quiz:[
     {q:"What does a Volt measure?",
-     opts:["The rate of current flow","Electrical pressure/force pushing current through a circuit","Resistance to current flow","The size of a wire"], a:1},
+     opts:["The rate at which current flows","The electrical force that pushes current through a circuit","How much a circuit resists current flow","How fast a battery discharges"], a:1},
     {q:"What does an Amp measure?",
-     opts:["Electrical pressure","The rate of electrical current flow","Resistance","Wire insulation thickness"], a:1},
+     opts:["The electrical pressure in a circuit","The rate of current flow through a circuit","How much a load resists current","The voltage drop across a switch"], a:1},
     {q:"What does an Ohm measure?",
-     opts:["Current flow rate","Voltage drop only","Resistance to current flow","Battery capacity"], a:2},
-    {q:"According to Ohm's Law, if a 12V circuit has a 4Ω load, how many amps will it draw?",
-     opts:["1 amp","3 amps","8 amps","48 amps"], a:1},
+     opts:["The rate of current flow","The electrical pressure in a circuit","The opposition to current flow","The capacity of a battery"], a:2},
+    {q:"A 12V circuit has a 4Ω load. Using Ohm's Law, how many amps will it draw?",
+     opts:["1 amp","2 amps","3 amps","6 amps"], a:2},
+    {q:"A 24V circuit has a 6Ω load. Using Ohm's Law, how many amps will it draw?",
+     opts:["2 amps","4 amps","8 amps","12 amps"], a:1},
     {q:"Why should you never pierce a wire's insulation to take a meter reading?",
-     opts:["It's slower than other methods","It lets moisture and corrosion into the conductor, causing a future intermittent fault","It voids the DVOM warranty","Piercing tools are expensive"], a:1},
+     opts:["It slows down the test","It can let corrosion into the wire, causing a failure later","It drains the vehicle's battery faster","It voids the DVOM's warranty"], a:1},
     {q:"Why shouldn't you force a meter probe into a sealed connector cavity?",
-     opts:["It can spread the female terminal or bend a male pin, creating a new bad connection","It will trip a circuit breaker","It discharges the battery","It's against OSHA rules"], a:0},
-    {q:"To measure current (Amps) correctly, the meter must be connected:",
-     opts:["Across two points, just like a voltmeter","In series, in the actual path the current flows through","Only when the circuit is de-energized","It doesn't matter how it's connected"], a:1},
-    {q:"To measure resistance (Ohms) correctly, the circuit should be:",
-     opts:["Fully powered and under load","De-energized (switch open / no current flowing)","Running at high RPM","Submerged in water"], a:1}
+     opts:["It can spread or bend a terminal, creating a new fault","It shorts the battery to ground","It burns out the meter's internal fuse","It's a DOT paperwork violation"], a:0},
+    {q:"To correctly measure current (Amps), the meter must be connected:",
+     opts:["Across the two ends of a component","In series, in the actual path the current flows through","With the circuit fully de-energized","With the leads reversed from normal"], a:1},
+    {q:"To correctly measure resistance (Ohms), the circuit should be:",
+     opts:["Powered and under normal load","De-energized, with no current flowing","Running at maximum RPM","Tested with an analog meter only"], a:1},
+    {q:"What's the correct way to test a sealed connector without damaging it?",
+     opts:["Push the probe past the seal into the cavity","Use the factory back-probe point or an accessible splice","Cut the wire and twist the meter leads on","Warm the connector to loosen the seal first"], a:1}
   ]
 },
 {
@@ -158,6 +191,19 @@ const SECTIONS = [
   key:"power",
   title:"2. Power Supply & ESP System Basics",
   refs:["esp"],
+  practical:{
+    type:"judgment",
+    title:"Energized or Action Required?",
+    intro:"Read each field scenario and decide whether it's normal operation or something that requires action before the vehicle returns to service.",
+    verdictLabels:["Normal — no action needed","Action Required"],
+    items:[
+      {prompt:"A 12-volt system reads 13.8V at the battery under load.", correct:0, explanation:"13.8V is well within the 9.0–17.0 VDC range for a 12-volt system."},
+      {prompt:"A 24-volt system reads 19V at the battery under load.", correct:1, explanation:"19V is below the 20–33.5 VDC range for a 24-volt system — a voltage DTC condition that disables ABS, ATC, and ESP."},
+      {prompt:"A shop shortened a tractor's wheelbase as part of a chassis modification.", correct:1, explanation:"Chassis modifications require disabling ESP and swapping in an ESP ATC EC-80 Controller, with cab signage updated."},
+      {prompt:"The ESP indicator lamp turns on for about 2.5 seconds at key-on, then goes off.", correct:0, explanation:"That's the normal self-test/bulb-check sequence at power-up with no DTCs present."},
+      {prompt:"A technician wants to install a random spare EC-80 controller from the shelf to replace a failed one.", correct:1, explanation:"Only a controller with the correct validated parameter set for that specific vehicle may be used."}
+    ]
+  },
   content:`
     <p>Andrews units are equipped with the <b>Bendix ESP EC-80</b> controller — the top tier of the EC-80
     family, adding Yaw Control (YC) and Roll Stability Program (RSP) on top of standard ABS and ATC. It uses
@@ -187,21 +233,43 @@ const SECTIONS = [
   `,
   quiz:[
     {q:"What is the normal 12-volt operating voltage range for the ESP EC-80 controller?",
-     opts:["6.0–12.0 VDC","9.0–17.0 VDC","20–33.5 VDC","5.0–9.0 VDC"], a:1},
+     opts:["6.0–12.0 VDC","9.0–17.0 VDC","10.0–14.0 VDC","5.0–9.0 VDC"], a:1},
     {q:"What is the operating voltage range for a 24-volt ESP EC-80 system?",
-     opts:["9.0–17.0 VDC","18–24 VDC","20–33.5 VDC","30–40 VDC"], a:2},
-    {q:"How many wire harness connectors does the ESP EC-80 controller use, and what does the extra one (X4) carry?",
-     opts:["Two; nothing extra","Three; the trailer ABS lamp","Four; the stability sensors (SAS, YRS/LAS, ABS pressure sensors)","Five; the engine ECU link"], a:2},
+     opts:["18–24 VDC","20–33.5 VDC","24–30 VDC","30–40 VDC"], a:1},
+    {q:"How many wire harness connectors does the ESP EC-80 controller use?",
+     opts:["Two","Three","Four","Five"], a:2},
+    {q:"What does the extra connector (X4) on an ESP EC-80 controller carry?",
+     opts:["The trailer ABS lamp circuit","The retarder relay wiring","The stability sensor circuits (SAS, YRS/LAS, pressure sensors)","The diagnostic tool port"], a:2},
     {q:"If a vehicle's chassis is significantly modified (e.g., wheelbase change), what must happen to the ESP system?",
-     opts:["Nothing, ESP adapts automatically","ESP must be disabled and the controller replaced with an ESP ATC EC-80 Controller, with cab signage updated","Only the tires need to be recalibrated","The radar must be removed"], a:1},
+     opts:["Nothing, ESP adjusts automatically","ESP must be disabled and the controller replaced with an ESP ATC EC-80 Controller, with cab signage updated","Only the tires need recalibrating","Only the radar needs to be removed"], a:1},
     {q:"Can any EC-80 controller be used as a replacement on an ESP-equipped vehicle?",
-     opts:["Yes, any EC-80 controller works","No — only a Controller with the correct validated parameter set for that vehicle may be used","Yes, as long as it has four connectors","Only if it's a 12-volt unit"], a:1}
+     opts:["Yes, any EC-80 controller works","No — only a controller with the correct validated parameter set for that vehicle","Yes, as long as it has four connectors","Only if it's a 24-volt unit"], a:1},
+    {q:"What happens to ABS, ATC, and ESP when supply voltage goes outside its normal range?",
+     opts:["Only ATC shuts down","All three are disabled, reverting to normal braking","The engine automatically derates","Nothing changes until the next power cycle"], a:1},
+    {q:"Why must ESP cab signage be removed after downgrading to an ESP ATC controller?",
+     opts:["It's required for warranty registration","So drivers don't assume stability protection is active when it isn't","To reduce vehicle weight","It's only a DOT paperwork formality"], a:1},
+    {q:"What will block the Fusion system from operating even if the radar and camera are both healthy?",
+     opts:["Cold weather","An active DTC on the engine, transmission, cluster, or ABS/ATC/ESP","Driving above 55 mph","Using cruise control"], a:1}
   ]
 },
 {
   key:"wss-pmv",
   title:"3. Wheel Speed Sensors, PMVs & Traction/Stability Valves",
   refs:["esp"],
+  practical:{
+    type:"judgment",
+    title:"Good Component or Faulty?",
+    intro:"Each reading below was taken with the vehicle's power off, probing the component directly. Classify it against the specs from this section.",
+    verdictLabels:["Good — within spec","Faulty — out of spec"],
+    items:[
+      {prompt:"A wheel speed sensor's leads measure 1,850 Ω.", correct:0, explanation:"1500–2500 Ω is the good range for a WSS."},
+      {prompt:"A wheel speed sensor's leads measure 6,200 Ω.", correct:1, explanation:"Well above the 1500–2500 Ω spec — an open or damaged sensor."},
+      {prompt:"A PMV reads 5.1 Ω from Release to Common.", correct:0, explanation:"4.9–5.5 Ω is the good range for Release-to-Common or Hold-to-Common."},
+      {prompt:"A PMV reads 15.0 Ω from Release to Hold.", correct:1, explanation:"9.8–11.0 Ω is the good range for Release-to-Hold — 15.0 Ω is out of spec."},
+      {prompt:"A Traction Control Valve (TCV) reads 12 Ω.", correct:0, explanation:"7–19 Ω is the good range for a TCV."},
+      {prompt:"A tire size calibration shows 720 revolutions per mile on a 100-tooth exciter ring.", correct:1, explanation:"The acceptable ESP range is 376–665 rev/mi — 720 is out of range and will set a DTC."}
+    ]
+  },
   content:`
     <p>Wheel speed sensor (WSS) and pressure modulator valve (PMV) checks are the same starting point on ESP
     units as on any EC-80 system — simple resistance checks before condemning a part.</p>
@@ -227,23 +295,44 @@ const SECTIONS = [
   `,
   quiz:[
     {q:"For an ESP-equipped vehicle with a 100-tooth exciter ring, what is the acceptable tire revolutions-per-mile range?",
-     opts:["100–200","300–425","376–665","700–800"], a:2},
+     opts:["100–300","376–665","426–567","700–900"], a:1},
     {q:"What is the acceptable steer-axle-to-drive-axle rolling circumference ratio range?",
-     opts:["0.50–1.50","0.85–1.15","1.0 exactly, no tolerance","2.0–3.0"], a:1},
-    {q:"If a Steer Axle ABS Modulator DTC sets, what happens to ESP?",
-     opts:["Nothing, ESP is unaffected","ESP is disabled; ABS/ATC remain active on unaffected wheels","The whole vehicle shuts down","Only the trailer brakes are affected"], a:1},
+     opts:["0.50–1.50","0.85–1.15","1.00 exactly","2.0–3.0"], a:1},
     {q:"What resistance should you expect across a wheel speed sensor's leads?",
-     opts:["0–10 Ω","1500–2500 Ω","4.9–5.5 Ω","9.8–11.0 Ω"], a:1},
+     opts:["50–100 Ω","500–1000 Ω","1500–2500 Ω","5000–10,000 Ω"], a:2},
+    {q:"What resistance should you expect between a PMV's Release and Common, or Hold and Common?",
+     opts:["1–2 Ω","4.9–5.5 Ω","9.8–11.0 Ω","15–20 Ω"], a:1},
+    {q:"What resistance should you expect between a PMV's Release and Hold terminals?",
+     opts:["4.9–5.5 Ω","7–19 Ω","9.8–11.0 Ω","20–25 Ω"], a:2},
+    {q:"What resistance should you expect across a Traction Control Valve (TCV)?",
+     opts:["4.9–5.5 Ω","7–19 Ω","9.8–11.0 Ω","25–30 Ω"], a:1},
+    {q:"If a Steer Axle ABS Modulator DTC sets, what happens?",
+     opts:["ABS, ATC, and ESP are all disabled together","ESP is disabled; ABS/ATC remain active on unaffected wheels","Only the trailer brakes are affected","Nothing, the DTC is informational only"], a:1},
+    {q:"If a Drive Axle or Additional Axle Modulator/WSS DTC sets, what happens?",
+     opts:["ATC and ESP are disabled, but ABS stays active on unaffected wheels","Only ESP is disabled","The whole vehicle's electrical system shuts down","Nothing until the next power cycle"], a:0},
+    {q:"If an ECU-level or voltage-out-of-range DTC sets, what happens?",
+     opts:["Only ESP is disabled","Only ATC is disabled","ABS, ATC, and ESP are all disabled, reverting to normal braking","Only a dash warning appears with no functional change"], a:2},
     {q:"What conditions must be met for the ECU to update its automatic tire size calibration?",
-     opts:["Vehicle stopped with engine off","Ratio in range, speed above ~12 mph, no accel/decel, and no active WSS DTCs","Only during a blink code session","Anytime the ignition is cycled"], a:1},
-    {q:"An ECU-level DTC or a voltage-out-of-range DTC affects which systems?",
-     opts:["Only ESP","Only the radar","ABS, ATC, and ESP together — the vehicle reverts to normal braking","Only the trailer ABS lamp"], a:2}
+     opts:["Vehicle stopped with the parking brake set","Ratio in range, speed above ~12 mph, steady speed, and no active WSS DTCs","Only during a blink code session","Anytime the ignition is cycled"], a:1}
   ]
 },
 {
   key:"stability",
   title:"4. Stability Sensors: SAS, Yaw Rate/Lateral Accel & ABS Pressure",
   refs:["esp"],
+  practical:{
+    type:"judgment",
+    title:"Stability Sensor Diagnosis",
+    intro:"Decide whether each scenario is a normal reading or points to a fault needing further diagnosis.",
+    verdictLabels:["Normal reading","Needs further diagnosis"],
+    items:[
+      {prompt:"With the SAS and YRS both plugged in, ECU pins 7 & 8 read 60 Ω.", correct:0, explanation:"60 Ω between those pins with both sensors connected is the expected reading."},
+      {prompt:"SAS pins 3 & 4 read 500 Ω.", correct:1, explanation:"SAS pins 3 & 4 should read about 120 Ω — 500 Ω suggests a wiring or sensor problem."},
+      {prompt:"A DTC 10 (SAS Plausibility Check) is active, and live data shows the SAS and YRS signals moving in opposite directions during a turn.", correct:1, explanation:"SAS and YRS should track together, not oppose each other — this needs further diagnosis before condemning either sensor."},
+      {prompt:"An ABS Pressure Sensor DTC is active, and the ABS and ATC indicator lamps stay off with both systems working normally.", correct:0, explanation:"An ABS Pressure Sensor DTC only disables ESP — ABS and ATC remaining active is expected."},
+      {prompt:"A steering gear was just replaced, and no SAS recalibration was performed afterward.", correct:1, explanation:"Steering mechanism, linkage, or gear work requires SAS recalibration — skipping it can cause yaw control to malfunction."}
+    ]
+  },
   content:`
     <p>This section is unique to ESP-equipped units — these sensors don't exist on plain ABS or ATC
     controllers. They're what make Yaw Control and Roll Stability Program possible.</p>
@@ -272,24 +361,40 @@ const SECTIONS = [
     ABS Pressure Sensor or ABS Air Bag Pressure Sensor DTC.</p>
   `,
   quiz:[
-    {q:"Which sensor is unique to ESP-tier EC-80 controllers and not present on plain ABS or ATC systems?",
-     opts:["Wheel speed sensor","Steering Angle Sensor / Yaw Rate Sensor","Pressure modulator valve","Battery voltage sensor"], a:1},
+    {q:"Which sensor group is unique to ESP-tier EC-80 controllers, not present on plain ABS or ATC systems?",
+     opts:["Wheel speed sensors","Steering Angle Sensor and Yaw Rate Sensor","Pressure modulator valves","Battery voltage sensors"], a:1},
     {q:"When must the Steering Angle Sensor be recalibrated?",
-     opts:["Never, it's maintenance-free","Any time steering mechanism, linkage, steering gear, or wheel track work is performed, or the sensor is replaced","Only once a year","Only after a tire rotation"], a:1},
+     opts:["Never, it's maintenance-free","After steering, linkage, or wheel track work, or sensor replacement","Only once a year, on a fixed schedule","Only after a tire rotation"], a:1},
     {q:"What tool is required to calibrate the SAS and YRS?",
-     opts:["A basic multimeter only","Bendix ACom Diagnostic Software","A torque wrench","The blink code switch alone"], a:1},
+     opts:["A basic multimeter only","Bendix ACom Diagnostic Software","A torque wrench","A specific blink code sequence"], a:1},
     {q:"What does DTC code 10 (SAS Plausibility Check) indicate?",
-     opts:["A blown fuse","The SAS signal disagrees with the Yaw Rate Sensor signal — they should track together","The tires are the wrong size","J1939 is disconnected"], a:1},
+     opts:["A blown fuse in the ECU","The SAS signal disagrees with the Yaw Rate Sensor signal","The battery voltage is too low","The tires are undersized"], a:1},
     {q:"If a Yaw Rate/Lateral Acceleration Sensor DTC sets, what happens to ABS and ATC?",
      opts:["They are also disabled","They remain fully active — only ESP is disabled","The vehicle won't start","They switch to off-road mode"], a:1},
-    {q:"What should you check before condemning the SAS or YRS if a plausibility DTC is active?",
-     opts:["Replace both sensors immediately","Monitor both sensors' live data in ACom — their signals should track together, not oppose each other","Check tire pressure","Nothing further is needed"], a:1}
+    {q:"What should you check before condemning the SAS or YRS on a plausibility DTC?",
+     opts:["Replace both sensors immediately","Monitor both sensors' live data in ACom to see if they track together","Check the tire pressure","Nothing further, it will self-clear"], a:1},
+    {q:"What resistance should you expect at the SAS between pins 3 and 4?",
+     opts:["0 Ω","60 Ω","120 Ω","1500 Ω"], a:2},
+    {q:"With the SAS and YRS both plugged in, what resistance should you expect at ECU pins 7 and 8?",
+     opts:["0 Ω","60 Ω","120 Ω","250 Ω"], a:1},
+    {q:"If an ABS Pressure Sensor DTC sets, what happens to ABS and ATC?",
+     opts:["Both are disabled along with ESP","Both remain active — only ESP is disabled","The whole vehicle's electrical system shuts down","There is no effect on any system"], a:1}
   ]
 },
 {
   key:"j1939-blink",
   title:"5. J1939 Communications & Blink Code Diagnostics",
   refs:["esp"],
+  practical:{
+    type:"blinkDecoder",
+    title:"Read the Blink Code",
+    intro:"Each trial flashes a simulated ABS indicator lamp exactly like a real blink code message (blink groups separated by a longer pause). Watch it, then choose the code you read.",
+    trials:[
+      {code:[2,1], options:["2,1 — Left Steer Axle Sensor, Excessive Air Gap","1,2 — No DTCs","3,2 — Right Steer Axle Sensor, Open or Shorted","2,2 — Left Steer Axle Sensor, Output Low at Drive-off"], correct:0, meaning:"Blink code 2,1 = Left Steer Axle Sensor, Excessive Air Gap. Check sensor-to-exciter-ring clearance and reseat it."},
+      {code:[7,7], options:["7,8 — Steer Axle Left PMV, Configuration Error","7,7 — Steer Axle Left PMV, Common Open Circuit","1,1 — No DTCs","7,7 — Left Steer Axle Sensor, Tire Size Calibration"], correct:1, meaning:"Blink code 7,7 = Steer Axle Left PMV, Common Open Circuit — check the wiring harness and PMV connector."},
+      {code:[1,1], options:["7,1 — Pressure Modulator Valve fault","2,1 — Wheel speed sensor fault","1,1 — No DTCs present","1,1 — J1939 communication loss"], correct:2, meaning:"Blink code 1,1 = No DTCs — the system checked out clean."}
+    ]
+  },
   content:`
     <p>Blink codes let you troubleshoot without a laptop. The ABS indicator lamp blinks two-digit code
     groups; record each group and look it up in the DTC index.</p>
@@ -317,24 +422,46 @@ const SECTIONS = [
     controllers at once.</p>
   `,
   quiz:[
-    {q:"How many digits does the System Configuration Check blink sequence use on an ESP-equipped controller?",
-     opts:["Five","Six","Seven","Ten"], a:2},
-    {q:"What does the 7th digit of the ESP System Configuration Check represent?",
-     opts:["Retarder configuration","Stability configuration (1 = none, 2 = ESP)","Tire size","Battery voltage"], a:1},
-    {q:"On an ESP-equipped controller, what does Dynamometer Test Mode disable?",
-     opts:["Only the radio","ATC brake/engine control, drag torque control, and the full ESP system","Only the headlights","Nothing, it's informational only"], a:1},
+    {q:"How many times do you press the blink code switch to enter Active DTC retrieval mode?",
+     opts:["1","3","5","7"], a:0},
+    {q:"How many times do you press the blink code switch to enter Inactive DTC retrieval mode?",
+     opts:["1","2","4","6"], a:1},
     {q:"How many times do you press the blink code switch to clear active DTCs?",
-     opts:["1","2","3","4"], a:2},
-    {q:"What must you disconnect before running a dynamometer test on a Fusion/Wingman-equipped ESP vehicle?",
-     opts:["The horn","Power to the radar sensor","The parking brake valve","The J1939 backbone entirely"], a:1},
+     opts:["1","2","3","5"], a:2},
+    {q:"How many digits does the System Configuration Check blink sequence use on an ESP-equipped controller?",
+     opts:["Five","Six","Seven","Nine"], a:2},
+    {q:"What does the 7th digit of the ESP System Configuration Check represent?",
+     opts:["Retarder configuration","Tire size setting","Stability configuration (1 = none, 2 = ESP)","Battery voltage level"], a:2},
+    {q:"On an ESP-equipped controller, what does Dynamometer Test Mode disable?",
+     opts:["Only the headlights","ATC brake/engine control, drag torque control, and the full ESP system","Only the parking brake indicator","Nothing, it's purely informational"], a:1},
+    {q:"How do you exit Dynamometer Test Mode?",
+     opts:["Cycle the ignition once","Press and release the blink switch 3 times, or use a diagnostic tool","Wait 24 hours for it to time out","Disconnect the battery for an hour"], a:1},
+    {q:"What must you disconnect before running a dynamometer test on a Fusion-equipped ESP vehicle?",
+     opts:["The horn","Power to the radar sensor","The fuel line","The J1939 backbone entirely"], a:1},
     {q:"What happens to the J1939 link if the High and Low wiring circuits are shorted together?",
-     opts:["Nothing, J1939 is redundant","The entire J1939 link can be lost, sometimes intermittently, logging DTCs in multiple controllers","Only ATC is affected","The engine shuts off"], a:1}
+     opts:["Nothing, J1939 is redundant","The link can be lost, sometimes intermittently, logging DTCs in multiple controllers","Only the radio loses signal","The engine shuts off automatically"], a:1},
+    {q:"What is the pause length between blink code digits within a message?",
+     opts:["0.5 seconds","1.5 seconds","2.5 seconds","5 seconds"], a:1}
   ]
 },
 {
   key:"fusion",
   title:"6. Fusion System: FLC-25 Camera & FLR-25 Radar",
   refs:["camera","radar"],
+  practical:{
+    type:"judgment",
+    title:"Fusion Connector Readings",
+    intro:"Each reading below was taken at the camera or radar harness connector, unplugged, with ignition off (or under load where noted). Classify it against this section's specs.",
+    verdictLabels:["Good — within spec","Faulty — out of spec"],
+    items:[
+      {prompt:"Camera J1939 pins 3 & 9 read 0 Ω.", correct:0, explanation:"0 Ω is the correct reading for the camera's J1939 pins."},
+      {prompt:"Camera J1939 pins 3 & 9 read 45 Ω.", correct:1, explanation:"Should be 0 Ω — 45 Ω suggests a wiring or connector problem."},
+      {prompt:"Radar J1939 pins 4 & 7 read 60 Ω.", correct:0, explanation:"60 Ω is the correct reading for the radar's J1939 pins."},
+      {prompt:"Camera private comms pins 2 & 8 read 300 Ω.", correct:1, explanation:"Should read about 120 Ω — 300 Ω points to a wiring issue."},
+      {prompt:"Under load, the camera's Module Power pin (7) to ground reads 13.2 VDC.", correct:0, explanation:"10–16 VDC is the correct supply range for the camera."},
+      {prompt:"Under load, the radar's supply pin (1) to ground (pin 8) reads 8.5 VDC.", correct:1, explanation:"Below the 10–16 VDC spec — check for a voltage drop in the supply circuit."}
+    ]
+  },
   content:`
     <p>The Bendix Fusion system pairs the FLR-25 radar and FLC-25 camera with the ESP EC-80 controller to
     deliver AEB, Highway Departure Braking, Active Cruise with Braking, and Overspeed Alert. Because
@@ -363,21 +490,43 @@ const SECTIONS = [
   `,
   quiz:[
     {q:"What voltage should you expect at the FLC-25 camera's Module Power pin (pin 7) to ground, under load?",
-     opts:["5–9 VDC","10–16 VDC","12–24 VDC","0–5 VDC"], a:1},
+     opts:["5–9 VDC","10–16 VDC","18–24 VDC","24–30 VDC"], a:1},
+    {q:"What voltage should you expect at the FLR-25 radar's supply pin (pin 1) to ground (pin 8), under load?",
+     opts:["5–9 VDC","10–16 VDC","18–24 VDC","24–30 VDC"], a:1},
     {q:"Can the FLR-25 radar sensor be repositioned from its original OEM mounting location?",
-     opts:["Yes, anywhere on the bumper", "No — it must stay in the original OEM location; repositioning requires reprogramming the mounting offset", "Only if it's centered", "Only with a dealer waiver"], a:1},
+     opts:["Yes, anywhere on the bumper", "No — it must stay in the OEM location; repositioning requires an ACom offset reprogram", "Only if it's centered on the vehicle", "Only with written OEM approval, no reprogramming needed"], a:1},
     {q:"After replacing a camera, how long might calibration take before you should suspect a real fault?",
-     opts:["Up to 20 minutes of driving above 25 mph","5 seconds","It calibrates instantly at power-up","Only after a full oil change interval"], a:0},
-    {q:"A driver reports unexplained loss of engine power they interpreted as a 'false brake event.' What should you suspect first?",
-     opts:["A cracked windshield","A J1939 communication failure, often from an aftermarket EDL, GPS, or telematics device","A flat tire","Low coolant"], a:1},
-    {q:"On an Andrews (ESP-tier) unit, what will block the Fusion system from operating even if the radar and camera are perfectly healthy?",
-     opts:["Cold weather","An active DTC on the ESP EC-80 controller, engine, transmission, cruise, or instrument cluster","Driving over 55 mph","Using cruise control"], a:1}
+     opts:["It calibrates instantly at power-up","Up to 20 minutes of driving above 25 mph","About 5 seconds","Only after the next oil change interval"], a:1},
+    {q:"For radar service alignment, what speed and driving time does Bendix recommend?",
+     opts:["Above 20 mph for about 5 minutes","Above 30 mph, typically 15–60 minutes","Above 50 mph for 2 hours","Any speed, it's instantaneous"], a:1},
+    {q:"A driver reports an unexplained loss of engine power they interpreted as a 'false brake event.' What should you suspect first?",
+     opts:["A cracked windshield","A J1939 communication failure, often from an aftermarket EDL, GPS, or telematics device","A flat tire","A low coolant level"], a:1},
+    {q:"On an ESP-tier unit, what will block the Fusion system from operating even if the radar and camera are both healthy?",
+     opts:["Cold weather","An active DTC on the engine, transmission, cluster, or ABS/ATC/ESP","Driving above 55 mph","Using cruise control"], a:1},
+    {q:"With the camera unplugged and ignition off, what resistance should you expect between its J1939 pins (3 and 9)?",
+     opts:["0 Ω","60 Ω","120 Ω","250 Ω"], a:0},
+    {q:"With the radar unplugged and ignition off, what resistance should you expect between its J1939 pins (4 and 7)?",
+     opts:["0 Ω","60 Ω","120 Ω","250 Ω"], a:1}
   ]
 },
 {
   key:"wiring",
   title:"7. Wiring, Harnesses & Connectors",
   refs:["esp","camera","radar"],
+  practical:{
+    type:"judgment",
+    title:"Spot the Wiring Violation",
+    intro:"Decide whether each shop practice meets Bendix's wiring guidelines or is a violation that needs to be corrected.",
+    verdictLabels:["OK — meets guidelines","Violation — needs correction"],
+    items:[
+      {prompt:"A technician secures sensor wiring to the axle every 8 inches using UV-stabilized non-metallic clamps.", correct:0, explanation:"6–12 inches (6–8 along hoses) with UV-stabilized clamps is exactly the guideline."},
+      {prompt:"A technician uses a standard zip tie to strap a wiring harness directly to a rubber air line.", correct:1, explanation:"Standard tie-wraps on air lines can chafe through the wire jacket as the line pressurizes — non-metallic hose clamps or bow-tie ties should be used instead."},
+      {prompt:"A replacement Yaw Rate Sensor is installed in the same orientation, using the OEM bracket and torque spec.", correct:0, explanation:"That's exactly the required procedure for SAS/YRS replacement."},
+      {prompt:"A wire is bent sharply immediately as it exits a connector, with no straight run at all.", correct:1, explanation:"Wire should run straight for at least 3 inches out of a connector before any bend."},
+      {prompt:"An unused ECU connector is left open to the air after a wiring change.", correct:1, explanation:"Unused connectors must be capped and protected from moisture at all times."},
+      {prompt:"J1939 and sensor wiring are run as twisted pair, about 1–2 twists per inch.", correct:0, explanation:"That matches the guideline for sensor and J1939 wiring circuits."}
+    ]
+  },
   content:`
     <p>Most intermittent ESP and Fusion faults trace back to connectors and harness routing, not the
     controller itself — this is even more true on ESP units, which have a fourth connector (X4) and four
@@ -402,15 +551,23 @@ const SECTIONS = [
   `,
   quiz:[
     {q:"How often should wiring be secured along its run (e.g., along service brake hoses)?",
-     opts:["Every 1–2 inches","Every 6–12 inches (or 6–8 inches for sensor wiring along hoses)","Every 24 inches","Only at the connector"], a:1},
+     opts:["Every 1–2 inches","Every 6–12 inches (6–8 inches along hoses)","Every 24 inches","Only at the connector ends"], a:1},
     {q:"Why does Bendix recommend against standard tie-wraps directly on rubber air lines?",
-     opts:["They look unprofessional","Pressure cycling in the air line can cause premature wiring failure from the pressure exerted","They are more expensive","They interfere with J1939"], a:1},
+     opts:["They look unprofessional","Pressure cycling can chafe through the wire jacket over time","They're more expensive than clamps","They interfere with J1939 signals"], a:1},
     {q:"What should sensor and J1939 wiring circuits use?",
-     opts:["Solid single-conductor wire","Twisted pair wiring (1–2 twists per inch)","Bare wire","Coaxial cable"], a:1},
+     opts:["Solid single-conductor wire","Twisted pair wiring, about 1–2 twists per inch","Uninsulated bare wire","Shielded coaxial cable"], a:1},
     {q:"If the Steering Angle Sensor or Yaw Rate Sensor needs replacement, what's required?",
-     opts:["Any compatible sensor works in any position","An identical part, in the same orientation, using OEM brackets and torque specs — location/orientation must not be altered","A cheaper aftermarket substitute is preferred","No special care is needed"], a:1},
+     opts:["Any compatible sensor works in any position","An identical part, same orientation, using OEM brackets and torque specs","A cheaper aftermarket substitute is preferred","No particular care is needed"], a:1},
+    {q:"What do corroded connector terminals on a camera, radar, SAS, or YRS usually indicate?",
+     opts:["Normal wear, no action needed","Water intrusion — replace the harness, and the component if its own terminals are corroded","A loose ground strap only","A blown fuse further upstream"], a:1},
     {q:"How far should wire be routed straight out of a connector before it's allowed to bend?",
-     opts:["At least 3 inches","At least 12 inches","It doesn't matter","6 feet"], a:0}
+     opts:["1 inch","3 inches","12 inches","36 inches"], a:1},
+    {q:"A DTC clears and then instantly comes back after a repair. What should you check first?",
+     opts:["The battery only","Routing near rotating components and air line clamps for a chafe point","The dash lamp bulb","The vehicle's paint condition"], a:1},
+    {q:"What should always be true of unused ECU connectors?",
+     opts:["They can be left open to air","They must be capped and protected from moisture","They should be packed with grease","They must be grounded to the frame"], a:1},
+    {q:"What's required of all wire harness connectors during installation?",
+     opts:["Loosely connected for easy future removal","Fully seated, using secondary locks where provided","Taped over regardless of fit","Left slightly open for airflow"], a:1}
   ]
 }
 ];
@@ -421,9 +578,20 @@ let state = {
   screen: "welcome",
   sectionIndex: 0,
   sectionResults: {}, // key -> {score, total, passed}
+  practicalComplete: {}, // key -> true once that section's practical exercise is done
+  gateRefresh: null, // set by the content-gate while mounted, so exercises can notify it of progress
   reviewMode: false,
   activeDoc: null
 };
+
+// Called by any practical-exercise widget once the trainee has successfully
+// completed it. Reference-mode visits also call this (harmlessly) since the
+// exercise is available there too, just never required.
+function markPracticalComplete(key){
+  state.practicalComplete[key] = true;
+  if(typeof state.gateRefresh === "function") state.gateRefresh();
+}
+
 
 function totalScorePct(){
   let correct=0, total=0;
@@ -441,6 +609,12 @@ function allSectionsPassed(){
 const app = document.getElementById("app");
 
 function render(){
+  // Tear down any content-engagement gate (timer/observer) from a previous
+  // screen before wiping the DOM, so it doesn't keep firing against removed elements.
+  if(state.contentGateTimer){ clearInterval(state.contentGateTimer); state.contentGateTimer = null; }
+  if(state.contentGateObserver){ state.contentGateObserver.disconnect(); state.contentGateObserver = null; }
+  state.gateRefresh = null;
+
   app.innerHTML = "";
   if(state.screen === "welcome") return renderWelcome();
   if(state.screen === "reviewHome") return renderReviewHome();
@@ -549,10 +723,13 @@ function renderSectionContent(){
     <h2>${s.title}</h2>
     <div>${refBtns}</div>
     <div id="sectionContentBody" style="margin-top:16px;">${s.content}</div>
-    <div class="no-print" style="margin-top:24px;display:flex;gap:10px;">
+    <div id="practicalRoot"></div>
+    <div id="contentEndSentinel"></div>
+    <div class="no-print" style="margin-top:24px;">
       ${state.reviewOnly
         ? `<button class="btn-secondary" onclick="backToReviewHome()">Back to sections</button>`
-        : `<button class="btn-primary" id="toQuizBtn">Continue to Knowledge Check →</button>`
+        : `<button class="btn-primary" id="toQuizBtn" disabled>Continue to Knowledge Check →</button>
+           <p class="small" id="gateStatus" style="margin-top:8px;"></p>`
       }
     </div>
   `;
@@ -561,13 +738,71 @@ function renderSectionContent(){
   if(s.interactive === "dvom"){
     renderDvomWidget(document.getElementById("sectionContentBody"));
   }
+  if(s.practical){
+    renderPracticalExercise(document.getElementById("practicalRoot"), s);
+  }
 
   if(!state.reviewOnly){
-    document.getElementById("toQuizBtn").onclick = () => {
-      state.screen = "sectionQuiz";
-      render();
-    };
+    setUpContentGate(s);
   }
+}
+
+// Requires a minimum dwell time, actually scrolling to the end of the section
+// content, AND (when present) completing the practical exercise before
+// "Continue to Knowledge Check" unlocks — so a trainee can't just click
+// straight through every section without engaging with it. None of this
+// applies in reference mode, where this button isn't shown at all.
+function setUpContentGate(s){
+  const toQuizBtn = document.getElementById("toQuizBtn");
+  const gateStatus = document.getElementById("gateStatus");
+  const sentinel = document.getElementById("contentEndSentinel");
+  const needsPractical = !!s.practical || s.interactive === "dvom";
+
+  let reachedEnd = false;
+  let secondsLeft = MIN_READ_SECONDS;
+
+  function updateStatus(){
+    const practicalDone = !needsPractical || state.practicalComplete[s.key];
+    if(reachedEnd && secondsLeft <= 0 && practicalDone){
+      toQuizBtn.disabled = false;
+      gateStatus.textContent = "";
+      return;
+    }
+    toQuizBtn.disabled = true;
+    const parts = [];
+    if(secondsLeft > 0) parts.push(`${secondsLeft}s`);
+    if(!reachedEnd) parts.push("scroll to the end of this section");
+    if(needsPractical && !practicalDone) parts.push("complete the practical exercise below");
+    gateStatus.textContent = "Review the material to continue — " + parts.join(" · ");
+  }
+  state.gateRefresh = updateStatus;
+  updateStatus();
+
+  state.contentGateTimer = setInterval(() => {
+    if(secondsLeft > 0){
+      secondsLeft--;
+      updateStatus();
+      if(secondsLeft <= 0){
+        clearInterval(state.contentGateTimer);
+        state.contentGateTimer = null;
+      }
+    }
+  }, 1000);
+
+  state.contentGateObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if(entry.isIntersecting){
+        reachedEnd = true;
+        updateStatus();
+      }
+    });
+  }, { threshold: 0.9 });
+  state.contentGateObserver.observe(sentinel);
+
+  toQuizBtn.onclick = () => {
+    state.screen = "sectionQuiz";
+    render();
+  };
 }
 window.backToReviewHome = function(){ state.screen="reviewHome"; render(); };
 
@@ -596,10 +831,10 @@ function renderSectionQuiz(){
 
 function renderQuiz(s){
   const quizArea = document.getElementById("quizArea");
-  const already = state.sectionResults[s.key];
-  const answers = new Array(s.quiz.length).fill(null);
+  const quizInstance = buildQuizInstance(s.quiz);
+  const answers = new Array(quizInstance.length).fill(null);
 
-  quizArea.innerHTML = `<h3>Knowledge Check</h3>` + s.quiz.map((q,qi)=>`
+  quizArea.innerHTML = `<h3>Knowledge Check</h3>` + quizInstance.map((q,qi)=>`
     <div class="quiz-q" data-qi="${qi}">
       <p><b>${qi+1}. ${q.q}</b></p>
       ${q.opts.map((o,oi)=>`<div class="quiz-opt" data-oi="${oi}" onclick="selectOpt(${qi},${oi})">${o}</div>`).join("")}
@@ -610,6 +845,7 @@ function renderQuiz(s){
   `;
 
   quizArea._answers = answers;
+  quizArea._quiz = quizInstance;
 
   document.getElementById("submitQuizBtn").onclick = () => submitQuiz(s);
 }
@@ -625,9 +861,10 @@ window.selectOpt = function(qi, oi){
 
 async function submitQuiz(s){
   const quizArea = document.getElementById("quizArea");
+  const quiz = quizArea._quiz;
   const answers = quizArea._answers;
   let score = 0;
-  s.quiz.forEach((q,qi)=>{
+  quiz.forEach((q,qi)=>{
     const qDiv = quizArea.querySelector(`.quiz-q[data-qi="${qi}"]`);
     qDiv.querySelectorAll(".quiz-opt").forEach((el,oi)=>{
       if(oi === q.a) el.classList.add("correct");
@@ -635,14 +872,14 @@ async function submitQuiz(s){
     });
     if(answers[qi] === q.a) score++;
   });
-  const pct = score / s.quiz.length;
+  const pct = score / quiz.length;
   const passed = pct >= PASS_THRESHOLD;
-  state.sectionResults[s.key] = {score, total:s.quiz.length, passed};
+  state.sectionResults[s.key] = {score, total:quiz.length, passed};
 
   const resultDiv = document.getElementById("quizResult");
   resultDiv.innerHTML = `
     <div class="result-banner ${passed?'result-pass':'result-fail'}">
-      You scored ${score}/${s.quiz.length} (${Math.round(pct*100)}%) — ${passed ? "Passed" : "Not yet passing (80% required)"}
+      You scored ${score}/${quiz.length} (${Math.round(pct*100)}%) — ${passed ? "Passed" : "Not yet passing (80% required)"}
     </div>
     <button class="btn-primary" id="nextBtn">${passed ? (state.sectionIndex < SECTIONS.length-1 ? "Next Section" : "Finish Course") : "Retry Section"}</button>
   `;
@@ -667,19 +904,31 @@ async function finishCourse(){
   state.finalPassed = passedAll;
   state.completionDate = new Date().toLocaleDateString();
 
+  const resultPayload = {
+    name: state.name,
+    score: finalPct,
+    passed: passedAll,
+    date: state.completionDate,
+    sectionResults: state.sectionResults
+  };
+
   try{
     await fetch(RESULTS_ENDPOINT_RECORD, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({
-        name: state.name,
-        score: finalPct,
-        passed: passedAll,
-        date: state.completionDate,
-        sectionResults: state.sectionResults
-      })
+      body: JSON.stringify(resultPayload)
     });
   } catch(e){ /* non-fatal if function not yet deployed */ }
+
+  if(passedAll){
+    try{
+      await fetch(CERTIFICATE_EMAIL_ENDPOINT, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(resultPayload)
+      });
+    } catch(e){ /* non-fatal if function not yet deployed or email send fails */ }
+  }
 
   state.screen = "certificate";
   render();
@@ -800,6 +1049,7 @@ function renderDvomWidget(container){
 
       <div class="dvom-meter" id="dvomMeterDisplay">-- . -</div>
       <div class="dvom-note" id="dvomNote">Select a meter function and drag both probes onto test points to take a reading.</div>
+      <p class="small" id="dvomChecklist" style="margin-top:10px;"></p>
     </div>
   `;
   container.appendChild(wrap);
@@ -826,6 +1076,20 @@ function initDvomWidget(root){
   let mode = "V";
   let switchClosed = true;
   const assign = { red: null, black: null };
+  const progress = { V: false, OHM: false, A: false };
+  const checklistEl = root.querySelector("#dvomChecklist");
+
+  function updateChecklist(){
+    checklistEl.innerHTML =
+      "Practical checklist: " +
+      `<span style="color:${progress.V ? "var(--ok)" : "#888"};">${progress.V ? "✓" : "○"} Voltage</span> · ` +
+      `<span style="color:${progress.OHM ? "var(--ok)" : "#888"};">${progress.OHM ? "✓" : "○"} Resistance</span> · ` +
+      `<span style="color:${progress.A ? "var(--ok)" : "#888"};">${progress.A ? "✓" : "○"} Amps (in series)</span>`;
+    if(progress.V && progress.OHM && progress.A){
+      markPracticalComplete("dvom");
+    }
+  }
+  updateChecklist();
 
   // starting tray positions (below the circuit, inside container coordinate space)
   const trayPositions = {
@@ -988,6 +1252,8 @@ function initDvomWidget(root){
       if(pair === "CD") note = "0.0V across plain wire — good wire has essentially no resistance, so no voltage drop.";
       if(pair === "AD") note = "12.0V — the battery has 12V at its own terminals whether the switch is open or closed. A battery by itself, with no circuit connected at all, still reads full voltage here.";
       setNote(note, false);
+      progress.V = true;
+      updateChecklist();
     } else if(mode === "OHM"){
       if(switchClosed){
         meterDisplay.textContent = "-OL-";
@@ -1006,6 +1272,8 @@ function initDvomWidget(root){
         if(pair === "CD") note = "0.0Ω — plain wire, essentially no resistance.";
         if(pair === "AD" || pair === "AC") note = "Total resistance through the switch and lamp in this path.";
         setNote(note, false);
+        progress.OHM = true;
+        updateChecklist();
       }
     } else if(mode === "A"){
       const pair = [p1,p2].sort().join("");
@@ -1018,6 +1286,8 @@ function initDvomWidget(root){
       if(!switchClosed){
         meterDisplay.textContent = "0.0 A";
         setNote("Meter correctly connected in series — but the switch is open, so the circuit is de-energized and no current is flowing.", false);
+        progress.A = true;
+        updateChecklist();
         return;
       }
       // Correct polarity: current flows A -> switch -> IN -> (through meter) -> OUT -> lamp -> D.
@@ -1028,6 +1298,8 @@ function initDvomWidget(root){
       setNote(correctPolarity
         ? "3.0A — correct! The switch is closed (circuit energized). This is Ohm's Law in action: 12V ÷ 4Ω = 3A. The meter is in series, so all the circuit's current flows through it."
         : "Reading shows -3.0A. The meter is correctly in series and the current value is right, but the leads are reversed — red (V/Ω/A) should be on the source/upstream side, black (COM) on the load/downstream side.", false);
+      progress.A = true;
+      updateChecklist();
     }
   }
 
@@ -1051,6 +1323,163 @@ function initDvomWidget(root){
       placeProbe(el, trayPositions[key].left, trayPositions[key].top);
     });
   });
+}
+
+/* ---------------- PRACTICAL EXERCISE DISPATCHER ---------------- */
+function renderPracticalExercise(container, section){
+  const p = section.practical;
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "margin-top:20px;";
+  wrap.innerHTML = `
+    <style>
+      .pex-box{background:#fafcff;border:2px solid #d5dfe8;border-radius:10px;padding:16px;}
+      .pex-item{background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px 16px;margin-bottom:12px;}
+      .pex-item.solved{border-color:var(--ok);background:#f3fbf5;}
+      .pex-verdict-btns{display:flex;gap:10px;margin-top:10px;}
+      .pex-verdict-btn{flex:1;padding:10px;border-radius:6px;border:2px solid #ccc;background:#fff;font-weight:600;cursor:pointer;}
+      .pex-verdict-btn.correct{border-color:var(--ok);background:#e6f6ec;color:var(--ok);}
+      .pex-verdict-btn.incorrect{border-color:var(--bad);background:#fbeceb;color:var(--bad);}
+      .pex-explain{margin-top:8px;font-size:.88rem;color:#333;background:#eef4fb;padding:8px 10px;border-radius:6px;}
+      .pex-progress{font-weight:600;color:var(--navy);margin-bottom:10px;}
+      .pex-lamp{width:34px;height:34px;border-radius:50%;background:#333;display:inline-block;margin:0 8px -8px 0;transition:background .1s;}
+      .pex-lamp.on{background:#ffd54a;box-shadow:0 0 12px 4px rgba(255,213,74,.8);}
+    </style>
+    <div class="pex-box">
+      <h3 style="margin-top:0;">Practical Exercise${p.title ? ": " + escapeHtml(p.title) : ""}</h3>
+      ${p.intro ? `<p>${p.intro}</p>` : ""}
+      <div id="pexBody"></div>
+    </div>
+  `;
+  container.appendChild(wrap);
+
+  if(p.type === "judgment") initJudgmentExercise(wrap, section);
+  else if(p.type === "blinkDecoder") initBlinkDecoder(wrap, section);
+}
+
+/* --- Judgment exercise: trainee classifies each item using two verdict
+   buttons (labels configurable per section). Used for meter-reading
+   diagnosis, scenario judgment calls, and spot-the-violation checks. --- */
+function initJudgmentExercise(wrap, section){
+  const p = section.practical;
+  const body = wrap.querySelector("#pexBody");
+  const solved = new Set();
+
+  function render(){
+    body.innerHTML = `<div class="pex-progress">Progress: ${solved.size} / ${p.items.length} correct</div>` +
+      p.items.map((item, idx) => {
+        const isSolved = solved.has(idx);
+        return `
+          <div class="pex-item${isSolved ? " solved" : ""}" data-idx="${idx}">
+            <div>${item.prompt}</div>
+            <div class="pex-verdict-btns">
+              <button class="pex-verdict-btn" data-idx="${idx}" data-choice="0" ${isSolved ? "disabled" : ""}>${p.verdictLabels[0]}</button>
+              <button class="pex-verdict-btn" data-idx="${idx}" data-choice="1" ${isSolved ? "disabled" : ""}>${p.verdictLabels[1]}</button>
+            </div>
+            <div class="pex-feedback"></div>
+          </div>
+        `;
+      }).join("");
+
+    body.querySelectorAll(".pex-verdict-btn").forEach(btn => {
+      btn.onclick = () => {
+        const idx = Number(btn.dataset.idx);
+        const choice = Number(btn.dataset.choice);
+        const item = p.items[idx];
+        const itemDiv = body.querySelector(`.pex-item[data-idx="${idx}"]`);
+        const feedback = itemDiv.querySelector(".pex-feedback");
+        if(choice === item.correct){
+          btn.classList.add("correct");
+          feedback.innerHTML = `<div class="pex-explain">✓ Correct. ${item.explanation}</div>`;
+          itemDiv.querySelectorAll(".pex-verdict-btn").forEach(b => b.disabled = true);
+          solved.add(idx);
+          itemDiv.classList.add("solved");
+          body.querySelector(".pex-progress").textContent = `Progress: ${solved.size} / ${p.items.length} correct`;
+          if(solved.size === p.items.length){
+            markPracticalComplete(section.key);
+            body.insertAdjacentHTML("afterbegin", `<div class="result-banner result-pass" style="margin-bottom:14px;">Practical exercise complete!</div>`);
+          }
+        } else {
+          btn.classList.add("incorrect");
+          feedback.innerHTML = `<div class="pex-explain">Not quite — try the other option.</div>`;
+          setTimeout(() => btn.classList.remove("incorrect"), 700);
+        }
+      };
+    });
+  }
+  render();
+}
+
+/* --- Blink decoder: plays an animated lamp sequence for each trial; the
+   trainee reads the blink groups and picks what the code was, then sees
+   its meaning once correct. Mirrors reading a real ABS blink code. --- */
+function initBlinkDecoder(wrap, section){
+  const p = section.practical;
+  const body = wrap.querySelector("#pexBody");
+  const solved = new Set();
+  let currentTrial = 0;
+
+  function playSequence(groups, lampEl, onDone){
+    let seq = [];
+    groups.forEach((count, gi) => {
+      for(let b = 0; b < count; b++){ seq.push("on"); seq.push("off"); }
+      if(gi < groups.length - 1) seq.push("pause");
+    });
+    let i = 0;
+    function step(){
+      if(i >= seq.length){ onDone(); return; }
+      const t = seq[i];
+      lampEl.classList.toggle("on", t === "on");
+      i++;
+      setTimeout(step, t === "pause" ? 500 : 300);
+    }
+    step();
+  }
+
+  function render(){
+    if(currentTrial >= p.trials.length){
+      body.innerHTML = `<div class="result-banner result-pass">Practical exercise complete!</div>`;
+      markPracticalComplete(section.key);
+      return;
+    }
+    const trial = p.trials[currentTrial];
+    body.innerHTML = `
+      <div class="pex-progress">Trial ${currentTrial + 1} of ${p.trials.length}</div>
+      <div class="pex-item">
+        <p><span class="pex-lamp" id="blinkLamp"></span> <button class="btn-secondary" id="playBlinkBtn">▶ Play blink sequence</button></p>
+        <p class="small">Watch the lamp, count the blinks in each group, then choose the code you read.</p>
+        <div id="blinkOptions" style="margin-top:10px;"></div>
+        <div class="pex-feedback"></div>
+      </div>
+    `;
+    const lamp = body.querySelector("#blinkLamp");
+    body.querySelector("#playBlinkBtn").onclick = () => playSequence(trial.code, lamp, () => {});
+
+    const optionsDiv = body.querySelector("#blinkOptions");
+    optionsDiv.innerHTML = trial.options.map((opt, oi) =>
+      `<div class="quiz-opt" data-oi="${oi}">${opt}</div>`
+    ).join("");
+    optionsDiv.querySelectorAll(".quiz-opt").forEach(el => {
+      el.onclick = () => {
+        const oi = Number(el.dataset.oi);
+        const feedback = body.querySelector(".pex-feedback");
+        if(oi === trial.correct){
+          el.classList.add("correct");
+          feedback.innerHTML = `<div class="pex-explain">✓ Correct — ${trial.meaning}</div>`;
+          optionsDiv.querySelectorAll(".quiz-opt").forEach(o => o.onclick = null);
+          const nextBtn = document.createElement("button");
+          nextBtn.className = "btn-primary";
+          nextBtn.style.marginTop = "10px";
+          nextBtn.textContent = currentTrial < p.trials.length - 1 ? "Next trial" : "Finish exercise";
+          nextBtn.onclick = () => { currentTrial++; render(); };
+          feedback.appendChild(nextBtn);
+        } else {
+          el.classList.add("incorrect");
+          setTimeout(() => el.classList.remove("incorrect"), 700);
+        }
+      };
+    });
+  }
+  render();
 }
 
 /* ---------------- DOC VIEWER ---------------- */

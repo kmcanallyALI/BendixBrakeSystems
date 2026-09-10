@@ -19,6 +19,9 @@ not what's on our fleet.
   log; if they already passed, the course opens straight into **reference mode**
 - `netlify/functions/record-result.js` — appends a completion record to
   `results/troubleshooting-results.json` in this repo via the GitHub Contents API
+- `netlify/functions/send-certificate.js` — emails a certificate summary (name,
+  score, date, section-by-section breakdown) to you via Resend whenever someone
+  passes the full course
 - `netlify.toml` — Netlify build/redirect config
 
 This is a **separate** repo/site from the existing PM-Training-Classes course,
@@ -39,6 +42,33 @@ other as passed, and vice versa.
 5. Deploy. The first time anyone passes the course, this repo will automatically
    get a new `results/troubleshooting-results.json` file committed by the
    Netlify function — you don't need to create it by hand.
+
+## Getting certificates emailed to you
+
+Certificate emails are sent through [Resend](https://resend.com), which has a
+free tier that's enough for this course's volume.
+
+1. Sign up at resend.com **using kmcanally@andrewslogistics.com** as the account
+   email. On Resend's free/unverified-domain tier, you can only send email *to*
+   the address your account is registered under — so signing up with that
+   address is what makes delivery to yourself work without any extra setup.
+2. In the Resend dashboard, go to **API Keys** and create a new key.
+3. In Netlify, add one more environment variable:
+   - `RESEND_API_KEY` = the key from step 2
+   - (Optional) `CERT_EMAIL_TO` — only needed if you ever want certificates to
+     go somewhere other than kmcanally@andrewslogistics.com
+   - (Optional) `CERT_EMAIL_FROM` — only needed once you verify your own sending
+     domain in Resend; until then it defaults to Resend's built-in
+     `onboarding@resend.dev` sender, which works with no setup
+4. Redeploy (or just wait for the next deploy) so the function picks up the new
+   variable.
+
+That's it — from then on, whenever a trainee passes all sections, you'll get an
+email with their name, final score, completion date, and a section-by-section
+breakdown, in addition to the record being committed to
+`results/troubleshooting-results.json`. If you later want certificates sent to
+the trainee as well, that needs a name field for their email added to the
+welcome screen — let me know and I'll wire that up.
 
 ## How the "already passed" check works
 
