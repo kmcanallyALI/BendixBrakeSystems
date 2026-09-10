@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bendix EC-80 / Fusion Troubleshooting Training — Andrews Logistics</title>
+<style>
+  :root{
+    --navy:#0b2545; --blue:#1560bd; --amber:#e8a628; --gray:#f4f6f8;
+    --text:#1a1f27; --ok:#1e8f4e; --bad:#c23a2e;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--gray);color:var(--text);}
+  header{background:var(--navy);color:#fff;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;}
+  header h1{font-size:1.15rem;margin:0;}
+  header .badge{background:var(--amber);color:#1a1f27;padding:4px 10px;border-radius:4px;font-size:.8rem;font-weight:600;}
+  #app{max-width:880px;margin:0 auto;padding:28px 20px 80px;}
+  .card{background:#fff;border-radius:10px;padding:28px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:20px;}
+  h2{color:var(--navy);margin-top:0;}
+  h3{color:var(--blue);}
+  button{cursor:pointer;border:none;border-radius:6px;padding:12px 22px;font-size:1rem;font-weight:600;}
+  .btn-primary{background:var(--blue);color:#fff;}
+  .btn-primary:disabled{background:#9db6d0;cursor:not-allowed;}
+  .btn-secondary{background:#e2e8ef;color:var(--navy);}
+  .btn-ref{background:#fff;color:var(--blue);border:2px solid var(--blue);padding:8px 14px;font-size:.9rem;margin:4px 6px 4px 0;}
+  .btn-ref:hover{background:var(--blue);color:#fff;}
+  input[type=text]{width:100%;padding:12px;font-size:1rem;border:1px solid #ccc;border-radius:6px;}
+  .progress-bar{height:8px;background:#e2e8ef;border-radius:4px;overflow:hidden;margin-bottom:24px;}
+  .progress-fill{height:100%;background:var(--blue);transition:width .3s;}
+  .section-nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
+  .section-pill{padding:6px 12px;border-radius:20px;background:#e2e8ef;font-size:.8rem;color:var(--navy);}
+  .section-pill.done{background:var(--ok);color:#fff;}
+  .section-pill.active{background:var(--blue);color:#fff;}
+  .fact-box{background:#eef4fb;border-left:4px solid var(--blue);padding:12px 16px;margin:14px 0;border-radius:4px;}
+  .warn-box{background:#fdecea;border-left:4px solid var(--bad);padding:12px 16px;margin:14px 0;border-radius:4px;}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.92rem;}
+  th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+  th{background:#eef2f6;}
+  .quiz-q{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #eee;}
+  .quiz-opt{display:block;margin:6px 0;padding:10px 12px;border:1px solid #ccc;border-radius:6px;cursor:pointer;}
+  .quiz-opt:hover{background:#f0f4f9;}
+  .quiz-opt.selected{border-color:var(--blue);background:#e8f0fb;}
+  .quiz-opt.correct{border-color:var(--ok);background:#e6f6ec;}
+  .quiz-opt.incorrect{border-color:var(--bad);background:#fbeceb;}
+  .result-banner{padding:16px;border-radius:8px;font-weight:600;margin-bottom:16px;}
+  .result-pass{background:#e6f6ec;color:var(--ok);}
+  .result-fail{background:#fbeceb;color:var(--bad);}
+  .doc-embed{width:100%;height:75vh;border:1px solid #ccc;border-radius:6px;margin-top:12px;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px;}
+  .modal-box{background:#fff;border-radius:10px;padding:20px;max-width:1000px;width:100%;max-height:92vh;overflow:auto;}
+  .modal-close{float:right;}
+  #certificate{background:#fffdf6;border:10px double var(--navy);padding:50px;text-align:center;}
+  #certificate h1{color:var(--navy);font-size:2rem;margin-bottom:0;}
+  #certificate .name{font-size:1.8rem;color:var(--blue);margin:18px 0;border-bottom:2px solid var(--amber);display:inline-block;padding-bottom:6px;}
+  .small{font-size:.85rem;color:#555;}
+  .welcome-back{background:#eef8ee;border:1px solid var(--ok);padding:16px;border-radius:8px;margin-bottom:16px;}
+  @media print{
+    header,.no-print{display:none !important;}
+    body{background:#fff;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Bendix EC-80 / Fusion Troubleshooting Training</h1>
+  <span class="badge">Andrews Logistics — Preventive Maintenance</span>
+</header>
+<div id="app"></div>
+
+<script>
+/* ============================================================
+   BENDIX TROUBLESHOOTING TRAINING COURSE
+   Andrews Logistics — reference-and-test course built from
+   Bendix EC-80 ABS/ATC, FLC-25 Camera, and FLR-25 Radar
+   Service Data sheets.
+   ============================================================ */
+
+const RESULTS_ENDPOINT_CHECK = "/.netlify/functions/check-name";
+const RESULTS_ENDPOINT_RECORD = "/.netlify/functions/record-result";
+const PASS_THRESHOLD = 0.8;
+
+const REFERENCE_DOCS = [
+  {id:"abs-atc", label:"EC-80 ABS/ATC Service Data (SD-13-4983)", file:"docs/EC-80_ABS-ATC.pdf"},
+  {id:"esp", label:"EC-80 ESP Service Data (SD-13-4986)", file:"docs/EC-80_ESP.pdf"},
+  {id:"camera", label:"FLC-25 Camera Service Data (SD-29-50024)", file:"docs/FLC25_Camera.pdf"},
+  {id:"radar", label:"FLR-25 Radar Service Data (SD-29-50022)", file:"docs/FLR25_Radar.pdf"}
+];
+
+function docsByIds(ids){ return REFERENCE_DOCS.filter(d => ids.includes(d.id)); }
+
+/* ---------------- SECTIONS ---------------- */
+const SECTIONS = [
+{
+  key:"power",
+  title:"1. Power Supply & System Basics",
+  refs:["abs-atc","esp"],
+  content:`
+    <p>Every Bendix EC-80 diagnosis starts with the power supply and a clear picture of which controller tier
+    you're working on. The EC-80 family has three tiers: <b>ABS</b> (standard, two connectors), <b>ATC</b>
+    (adds traction control, three connectors), and <b>ESP</b> (adds full stability control, four connectors).</p>
+    <div class="fact-box"><b>Operating voltage range:</b> 9.0–17.0 VDC. Outside this range, ABS and ATC are
+    disabled and the system reverts to normal braking until voltage is restored.</div>
+    <table>
+      <tr><th>Test</th><th>Spec</th></tr>
+      <tr><td>Ignition-to-Ground (under load)</td><td>9–17 VDC</td></tr>
+      <tr><td>Battery-to-Ground (under load)</td><td>9–17 VDC</td></tr>
+      <tr><td>FLC-25 camera supply (pin 7 to ground, under load)</td><td>10–16 VDC</td></tr>
+      <tr><td>FLR-25 radar supply (pin 1 to ground pin 8, under load)</td><td>10–16 VDC</td></tr>
+    </table>
+    <p>Always load the circuit (e.g., an 1157 stop lamp) across the supply and ground before measuring —
+    an unloaded reading can look fine while the circuit fails under real current draw.</p>
+    <div class="warn-box"><b>Fusion system dependency:</b> the Fusion system (radar + camera + ESP EC-80)
+    will not operate — and will set its own DTC — if the engine, engine cruise, instrument cluster,
+    transmission, or ABS/ATC/ESP already has an active DTC. Always clear vehicle-level DTCs first;
+    that alone often restores full Fusion functionality.</div>
+  `,
+  quiz:[
+    {q:"What is the normal operating voltage range for an EC-80 controller?",
+     opts:["6.0–12.0 VDC","9.0–17.0 VDC","12.0–24.0 VDC","5.0–9.0 VDC"], a:1},
+    {q:"When performing a power supply test, why should you place a load (like an 1157 stop lamp) across the circuit?",
+     opts:["To brighten the dash lamp","To verify voltage holds up under real current draw, not just at no load","It is required by FMVSS-121","To discharge stored air pressure"], a:1},
+    {q:"If a Fusion system DTC won't clear, what should you check first?",
+     opts:["Replace the radar immediately","Check for active DTCs on engine, transmission, instrument cluster, or ABS/ATC/ESP and resolve those first","Recalibrate the camera","Replace the ECU"], a:1},
+    {q:"How many connectors does an EC-80 ATC controller use?",
+     opts:["Two","Three","Four","Six"], a:1},
+    {q:"What happens to ABS/ATC function when supply voltage goes out of the 9–17 VDC range?",
+     opts:["Nothing changes","ABS and ATC are disabled and the vehicle reverts to normal braking until voltage is restored","The vehicle shuts down","ATC switches to off-road mode"], a:1}
+  ]
+},
+{
+  key:"wss-pmv",
+  title:"2. Wheel Speed Sensors, PMVs & Traction Valves",
+  refs:["abs-atc"],
+  content:`
+    <p>Wheel speed sensor (WSS) and pressure modulator valve (PMV) faults are the most common EC-80 DTCs.
+    Both have simple resistance checks that should be your first move before condemning a part.</p>
+    <table>
+      <tr><th>Component</th><th>Measurement</th><th>Spec</th></tr>
+      <tr><td>WSS, sensor leads</td><td>Resistance</td><td>1500–2500 Ω</td></tr>
+      <tr><td>WSS, sensor to voltage/ground</td><td>Continuity</td><td>Open circuit (none)</td></tr>
+      <tr><td>WSS output</td><td>AC voltage @ ~0.5 rev/sec</td><td>&gt;0.25 VAC</td></tr>
+      <tr><td>PMV Release–Common</td><td>Resistance</td><td>4.9–5.5 Ω</td></tr>
+      <tr><td>PMV Hold–Common</td><td>Resistance</td><td>4.9–5.5 Ω</td></tr>
+      <tr><td>PMV Release–Hold</td><td>Resistance</td><td>9.8–11.0 Ω</td></tr>
+      <tr><td>TCV to TCV Common</td><td>Resistance</td><td>7–19 Ω</td></tr>
+    </table>
+    <div class="fact-box"><b>Chuff Test:</b> With brake pressure applied, a correctly wired PMV performs one
+    sharp exhaust (hold solenoid twice, release once). Two exhausts, or none, means incorrect wiring. The
+    ECU tests PMVs in a fixed order: Steer Right → Steer Left → Drive Right → Drive Left → Additional Right
+    → Additional Left — and will not run the test while the vehicle is moving.</div>
+    <p>Acceptable tire size (100-tooth exciter ring): 426–567 revolutions/mile (default 510). Outside that
+    range, the ECU sets a tire size calibration DTC.</p>
+  `,
+  quiz:[
+    {q:"What resistance should you expect across a wheel speed sensor's leads?",
+     opts:["0–10 Ω","1500–2500 Ω","4.9–5.5 Ω","9.8–11.0 Ω"], a:1},
+    {q:"During a correctly-wired PMV chuff test, how many exhausts of air should occur?",
+     opts:["Zero","One sharp exhaust","Two exhausts","Continuous exhaust"], a:1},
+    {q:"What does the ECU do if PMV wiring is incorrect during the chuff test?",
+     opts:["Nothing, it ignores it","Produces two exhausts of air, or none at all","Sets the parking brake","Disables the engine"], a:1},
+    {q:"What is the acceptable tire revolutions-per-mile range for a 100-tooth exciter ring?",
+     opts:["100–200","300–425","426–567","600–700"], a:2},
+    {q:"What is the correct chuff-test firing order?",
+     opts:["Drive axles first, then steer axles","Steer Right, Steer Left, Drive Right, Drive Left, Additional Right, Additional Left","Random order each time","Left side, then right side"], a:1},
+    {q:"The ECU will NOT perform a PMV chuff test when:",
+     opts:["The parking brake is set","Wheel speed sensors show the vehicle is in motion","The ignition is off","ATC is disabled"], a:1}
+  ]
+},
+{
+  key:"j1939-blink",
+  title:"3. J1939 Communications & Blink Code Diagnostics",
+  refs:["abs-atc"],
+  content:`
+    <p>Blink codes let you troubleshoot without a laptop. The ABS indicator lamp blinks two-digit code groups;
+    record each group and look it up in the DTC index.</p>
+    <table>
+      <tr><th>Switch presses</th><th>Mode entered</th></tr>
+      <tr><td>1</td><td>Active DTC retrieval</td></tr>
+      <tr><td>2</td><td>Inactive DTC retrieval</td></tr>
+      <tr><td>3</td><td>Clear active DTCs</td></tr>
+      <tr><td>4</td><td>System configuration check</td></tr>
+      <tr><td>5</td><td>Dynamometer Test Mode</td></tr>
+      <tr><td>7 (held before power-up)</td><td>Reconfigure ECU</td></tr>
+    </table>
+    <div class="fact-box"><b>Timing:</b> half-second blinks with half-second pauses; 1.5 sec between digits;
+    2.5 sec between messages; lamp stays on 5 seconds at the end. The ECU will not enter blink code mode if
+    wheel speed sensors indicate the vehicle is moving, and will exit blink code mode if motion begins.</div>
+    <p>J1939 wiring: J1939 Low and J1939 High must never be shorted together or reversed — either fault can
+    take down the whole serial link, sometimes intermittently, logging multiple DTCs across several
+    controllers at once.</p>
+    <div class="warn-box"><b>Dynamometer testing:</b> ATC/ESP must be disabled before any dyno work, and
+    power must be disconnected from the radar sensor whenever a dynamometer test is run on a Wingman/Fusion
+    equipped vehicle.</div>
+  `,
+  quiz:[
+    {q:"How many times do you press the blink code switch to enter Active DTC retrieval mode?",
+     opts:["1","3","5","7"], a:0},
+    {q:"How many times do you press the switch to clear active DTCs?",
+     opts:["1","2","3","4"], a:2},
+    {q:"What is the pause between blink code digits?",
+     opts:["0.5 seconds","1.5 seconds","2.5 seconds","5 seconds"], a:1},
+    {q:"Why won't the ECU enter diagnostic blink code mode in some situations?",
+     opts:["It's raining","Wheel speed sensors show the vehicle is in motion","The battery is low","It's after business hours"], a:1},
+    {q:"What must you disconnect before running a dynamometer test on a Fusion/Wingman-equipped vehicle?",
+     opts:["The horn","Power to the radar sensor","The parking brake valve","The J1939 backbone entirely"], a:1},
+    {q:"What happens to the J1939 link if the High and Low wiring circuits are shorted together?",
+     opts:["Nothing, J1939 is redundant","The entire J1939 link can be lost, sometimes intermittently","Only ATC is affected","The engine shuts off"], a:1}
+  ]
+},
+{
+  key:"fusion",
+  title:"4. Fusion System: FLC-25 Camera & FLR-25 Radar",
+  refs:["camera","radar"],
+  content:`
+    <p>The Bendix Fusion system combines the FLR-25 radar, FLC-25 camera, and ESP EC-80 controller to deliver
+    AEB, Highway Departure Braking, Active Cruise with Braking, and Overspeed Alert.</p>
+    <table>
+      <tr><th>Component</th><th>Connector power pin(s)</th><th>Spec</th></tr>
+      <tr><td>FLC-25 camera</td><td>Pin 7 (Module Power) to ground</td><td>10–16 VDC</td></tr>
+      <tr><td>FLR-25 radar</td><td>Pin 1 to ground (pin 8)</td><td>10–16 VDC</td></tr>
+      <tr><td>Camera private comms (unplugged, ignition off)</td><td>Pins 2 &amp; 8</td><td>~120 Ω</td></tr>
+      <tr><td>Camera J1939 (unplugged, ignition off)</td><td>Pins 3 &amp; 9</td><td>0 Ω</td></tr>
+      <tr><td>Radar J1939 (unplugged, ignition off)</td><td>Pins 4 &amp; 7</td><td>~60 Ω</td></tr>
+    </table>
+    <div class="warn-box"><b>Radar mounting is not adjustable:</b> the radar must stay in its original OEM
+    location. Never reposition it — repositioning requires reprogramming the mounting offset in ACom, and
+    unauthorized aftermarket bumper guards or covers can degrade or void the system entirely.</div>
+    <div class="fact-box"><b>Camera calibration:</b> after replacement, allow up to 20 minutes of driving
+    above 25 mph on well-marked roads before condemning a calibration fault. For radar service alignment,
+    drive above 30 mph (typically 15–60 minutes) with ACom monitoring until it reports "Alignment
+    Successful."</div>
+    <p>Common false-troubleshooting trap: a "false brake application" reported by a driver is often actually
+    a loss of engine throttle from a J1939 communication failure — frequently caused by aftermarket
+    Electronic Driver Logs, GPS, or telematics devices tapped into the CAN line.</p>
+  `,
+  quiz:[
+    {q:"What voltage should you expect at the FLC-25 camera's Module Power pin (pin 7) to ground, under load?",
+     opts:["5–9 VDC","10–16 VDC","12–24 VDC","0–5 VDC"], a:1},
+    {q:"Can the FLR-25 radar sensor be repositioned from its original OEM mounting location?",
+     opts:["Yes, anywhere on the bumper", "No — it must stay in the original OEM location; repositioning requires reprogramming the mounting offset", "Only if it's centered", "Only with a dealer waiver"], a:1},
+    {q:"After replacing a camera, how long might calibration take before you should suspect a real fault?",
+     opts:["Up to 20 minutes of driving above 25 mph","5 seconds","It calibrates instantly at power-up","Only after a full oil change interval"], a:0},
+    {q:"A driver reports unexplained loss of engine power/throttle they interpreted as a 'false brake event.' What should you suspect first?",
+     opts:["A cracked windshield","A J1939 communication failure, often from an aftermarket EDL, GPS, or telematics device","A flat tire","Low coolant"], a:1},
+    {q:"What is required before the Fusion system will operate normally?",
+     opts:["Nothing else matters as long as the radar is clean","No active DTCs on engine, transmission, instrument cluster, or ABS/ATC/ESP", "A full tank of fuel","The trailer must be unhooked"], a:1}
+  ]
+},
+{
+  key:"wiring",
+  title:"5. Wiring, Harnesses & Connectors",
+  refs:["abs-atc","camera","radar"],
+  content:`
+    <p>Most intermittent EC-80 and Fusion faults trace back to connectors and harness routing, not the
+    controller itself.</p>
+    <ul>
+      <li>All wire harness connectors must be fully seated — push until they click/seal, and use secondary
+      locks where provided.</li>
+      <li>Unused ECU connectors must be capped and protected from moisture at all times.</li>
+      <li>Sensor and J1939 circuits must use twisted-pair wire (1–2 twists per inch).</li>
+      <li>Route wires straight out of a connector for at least 3 inches before any bend.</li>
+      <li>Secure wiring every 6–12 inches with UV-stabilized, non-metallic clamps or bow-tie ties — never
+      standard tie-wraps directly on rubber air lines (pressure cycling can chafe through the wire jacket).</li>
+      <li>Corroded connector terminals on a camera or radar usually mean water intrusion — replace the whole
+      harness; if the component's own terminals are corroded, replace the component.</li>
+    </ul>
+    <div class="fact-box"><b>Diagnosis tip:</b> if a DTC clears and instantly comes back after a repair,
+    recheck routing near rotating components (wheel ends, drive shafts) and near air line clamps first —
+    chafe points reproduce themselves.</div>
+  `,
+  quiz:[
+    {q:"How often should wiring be secured along its run (e.g., along service brake hoses)?",
+     opts:["Every 1–2 inches","Every 6–12 inches (or 6–8 inches for sensor wiring along hoses)","Every 24 inches","Only at the connector"], a:1},
+    {q:"Why does Bendix recommend against standard tie-wraps directly on rubber air lines?",
+     opts:["They look unprofessional","Pressure cycling in the air line can cause premature wiring failure from the pressure exerted","They are more expensive","They interfere with J1939"], a:1},
+    {q:"What should sensor and J1939 wiring circuits use?",
+     opts:["Solid single-conductor wire","Twisted pair wiring (1–2 twists per inch)","Bare wire","Coaxial cable"], a:1},
+    {q:"If a camera or radar connector's terminals are corroded, what's the recommended action?",
+     opts:["Spray with electrical cleaner and reuse","Replace the harness, and replace the component if its own terminals are corroded","Ignore it if it still connects","Tape over it"], a:1},
+    {q:"How far should wire be routed straight out of a connector before it's allowed to bend?",
+     opts:["At least 3 inches","At least 12 inches","It doesn't matter","6 feet"], a:0}
+  ]
+}
+];
+
+/* ---------------- STATE ---------------- */
+let state = {
+  name: "",
+  screen: "welcome",
+  sectionIndex: 0,
+  sectionResults: {}, // key -> {score, total, passed}
+  reviewMode: false,
+  activeDoc: null
+};
+
+function totalScorePct(){
+  let correct=0, total=0;
+  SECTIONS.forEach(s=>{
+    const r = state.sectionResults[s.key];
+    if(r){ correct += r.score; total += r.total; }
+  });
+  return total ? Math.round((correct/total)*100) : 0;
+}
+function allSectionsPassed(){
+  return SECTIONS.every(s => state.sectionResults[s.key] && state.sectionResults[s.key].passed);
+}
+
+/* ---------------- RENDER ---------------- */
+const app = document.getElementById("app");
+
+function render(){
+  app.innerHTML = "";
+  if(state.screen === "welcome") return renderWelcome();
+  if(state.screen === "reviewHome") return renderReviewHome();
+  if(state.screen === "section") return renderSection();
+  if(state.screen === "certificate") return renderCertificate();
+}
+
+function renderWelcome(){
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <h2>Welcome</h2>
+    <p>This course covers troubleshooting the Bendix EC-80 ABS/ATC/ESP controller family and the Bendix
+    Fusion driver-assistance system (FLC-25 camera / FLR-25 radar), organized by troubleshooting topic
+    rather than by document.</p>
+    <p>Enter your full legal name below. If you've already passed this course, you'll be dropped straight
+    into <b>reference mode</b> so you can use it as a lookup tool without retaking the test.</p>
+    <label><b>Full legal name</b></label>
+    <input type="text" id="nameInput" placeholder="First Last" />
+    <p style="margin-top:18px;">
+      <button class="btn-primary" id="continueBtn">Continue</button>
+    </p>
+    <p id="lookupStatus" class="small"></p>
+  `;
+  app.appendChild(card);
+  document.getElementById("continueBtn").onclick = onWelcomeContinue;
+  document.getElementById("nameInput").addEventListener("keydown", e=>{ if(e.key==="Enter") onWelcomeContinue(); });
+}
+
+async function onWelcomeContinue(){
+  const val = document.getElementById("nameInput").value.trim();
+  const statusEl = document.getElementById("lookupStatus");
+  if(!val){ statusEl.textContent = "Please enter your name to continue."; return; }
+  state.name = val;
+  statusEl.textContent = "Checking for prior completion...";
+  try{
+    const res = await fetch(RESULTS_ENDPOINT_CHECK + "?name=" + encodeURIComponent(val));
+    if(res.ok){
+      const data = await res.json();
+      if(data && data.passed){
+        state.reviewMode = true;
+        state.priorRecord = data;
+        state.screen = "reviewHome";
+        render();
+        return;
+      }
+    }
+  } catch(e){ /* endpoint not deployed yet in local preview — fall through */ }
+  state.reviewMode = false;
+  state.screen = "section";
+  state.sectionIndex = 0;
+  render();
+}
+
+function renderReviewHome(){
+  const card = document.createElement("div");
+  card.className = "card";
+  const rec = state.priorRecord || {};
+  card.innerHTML = `
+    <div class="welcome-back">
+      <b>Welcome back, ${escapeHtml(state.name)}.</b> Our records show you already passed this course
+      ${rec.date ? "on " + escapeHtml(rec.date) : ""}${rec.score ? " with a score of " + escapeHtml(String(rec.score)) + "%" : ""}.
+      You're in <b>reference mode</b> — browse any section below and use the Reference Documents buttons to
+      pull up the source manuals. No quiz required.
+    </div>
+    <h2>Sections</h2>
+    <div class="section-nav">
+      ${SECTIONS.map((s,i)=>`<span class="section-pill" style="cursor:pointer" onclick="goToReviewSection(${i})">${s.title}</span>`).join("")}
+    </div>
+    <p><button class="btn-secondary" id="retakeBtn">Retake the full test anyway</button></p>
+  `;
+  app.appendChild(card);
+  document.getElementById("retakeBtn").onclick = ()=>{ state.reviewMode=false; state.screen="section"; state.sectionIndex=0; render(); };
+}
+window.goToReviewSection = function(i){
+  state.sectionIndex = i;
+  state.screen = "section";
+  state.reviewOnly = true;
+  render();
+};
+
+function renderSection(){
+  const s = SECTIONS[state.sectionIndex];
+  const card = document.createElement("div");
+  card.className = "card";
+
+  const pct = Math.round(((state.sectionIndex)/SECTIONS.length)*100);
+  const nav = SECTIONS.map((sec,i)=>{
+    let cls = "section-pill";
+    if(state.sectionResults[sec.key]) cls += " done";
+    if(i === state.sectionIndex) cls += " active";
+    return `<span class="${cls}">${i+1}. ${sec.key}</span>`;
+  }).join("");
+
+  const refBtns = docsByIds(s.refs).map(d =>
+    `<button class="btn-ref" onclick="openDoc('${d.id}')">📄 ${d.label}</button>`
+  ).join("");
+
+  card.innerHTML = `
+    ${state.reviewOnly ? "" : `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`}
+    <div class="section-nav">${nav}</div>
+    <h2>${s.title}</h2>
+    <div>${refBtns}</div>
+    <div style="margin-top:16px;">${s.content}</div>
+    <div id="quizArea" style="margin-top:24px;"></div>
+    <div class="no-print" style="margin-top:20px;display:flex;gap:10px;">
+      ${state.reviewOnly ? `<button class="btn-secondary" onclick="backToReviewHome()">Back to sections</button>` : ""}
+    </div>
+  `;
+  app.appendChild(card);
+
+  if(!state.reviewOnly){
+    renderQuiz(s);
+  }
+}
+window.backToReviewHome = function(){ state.screen="reviewHome"; render(); };
+
+function renderQuiz(s){
+  const quizArea = document.getElementById("quizArea");
+  const already = state.sectionResults[s.key];
+  const answers = new Array(s.quiz.length).fill(null);
+
+  quizArea.innerHTML = `<h3>Knowledge Check</h3>` + s.quiz.map((q,qi)=>`
+    <div class="quiz-q" data-qi="${qi}">
+      <p><b>${qi+1}. ${q.q}</b></p>
+      ${q.opts.map((o,oi)=>`<div class="quiz-opt" data-oi="${oi}" onclick="selectOpt(${qi},${oi})">${o}</div>`).join("")}
+    </div>
+  `).join("") + `
+    <button class="btn-primary" id="submitQuizBtn" disabled>Submit Section</button>
+    <div id="quizResult"></div>
+  `;
+
+  quizArea._answers = answers;
+
+  document.getElementById("submitQuizBtn").onclick = () => submitQuiz(s);
+}
+window.selectOpt = function(qi, oi){
+  const quizArea = document.getElementById("quizArea");
+  quizArea._answers[qi] = oi;
+  const qDiv = quizArea.querySelector(`.quiz-q[data-qi="${qi}"]`);
+  qDiv.querySelectorAll(".quiz-opt").forEach(el=>el.classList.remove("selected"));
+  qDiv.querySelector(`.quiz-opt[data-oi="${oi}"]`).classList.add("selected");
+  const allAnswered = quizArea._answers.every(a=>a!==null);
+  document.getElementById("submitQuizBtn").disabled = !allAnswered;
+};
+
+async function submitQuiz(s){
+  const quizArea = document.getElementById("quizArea");
+  const answers = quizArea._answers;
+  let score = 0;
+  s.quiz.forEach((q,qi)=>{
+    const qDiv = quizArea.querySelector(`.quiz-q[data-qi="${qi}"]`);
+    qDiv.querySelectorAll(".quiz-opt").forEach((el,oi)=>{
+      if(oi === q.a) el.classList.add("correct");
+      else if(oi === answers[qi]) el.classList.add("incorrect");
+    });
+    if(answers[qi] === q.a) score++;
+  });
+  const pct = score / s.quiz.length;
+  const passed = pct >= PASS_THRESHOLD;
+  state.sectionResults[s.key] = {score, total:s.quiz.length, passed};
+
+  const resultDiv = document.getElementById("quizResult");
+  resultDiv.innerHTML = `
+    <div class="result-banner ${passed?'result-pass':'result-fail'}">
+      You scored ${score}/${s.quiz.length} (${Math.round(pct*100)}%) — ${passed ? "Passed" : "Not yet passing (80% required)"}
+    </div>
+    <button class="btn-primary" id="nextBtn">${passed ? (state.sectionIndex < SECTIONS.length-1 ? "Next Section" : "Finish Course") : "Retry Section"}</button>
+  `;
+  document.getElementById("submitQuizBtn").style.display = "none";
+
+  document.getElementById("nextBtn").onclick = async () => {
+    if(!passed){ render(); return; }
+    if(state.sectionIndex < SECTIONS.length - 1){
+      state.sectionIndex++;
+      render();
+    } else {
+      await finishCourse();
+    }
+  };
+}
+
+async function finishCourse(){
+  const finalPct = totalScorePct();
+  const passedAll = allSectionsPassed();
+  state.finalScore = finalPct;
+  state.finalPassed = passedAll;
+  state.completionDate = new Date().toLocaleDateString();
+
+  try{
+    await fetch(RESULTS_ENDPOINT_RECORD, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        name: state.name,
+        score: finalPct,
+        passed: passedAll,
+        date: state.completionDate,
+        sectionResults: state.sectionResults
+      })
+    });
+  } catch(e){ /* non-fatal if function not yet deployed */ }
+
+  state.screen = "certificate";
+  render();
+}
+
+function renderCertificate(){
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <div id="certificate">
+      <h1>Certificate of Completion</h1>
+      <p>Bendix EC-80 / Fusion Troubleshooting Training</p>
+      <p>This certifies that</p>
+      <div class="name">${escapeHtml(state.name)}</div>
+      <p>has successfully completed the course with a final score of <b>${state.finalScore}%</b></p>
+      <p class="small">Completed: ${state.completionDate}</p>
+      <p class="small">Andrews Logistics LP — Preventive Maintenance Training</p>
+    </div>
+    <div class="no-print" style="margin-top:20px;display:flex;gap:10px;">
+      <button class="btn-primary" onclick="window.print()">Print / Save Certificate</button>
+      <button class="btn-secondary" onclick="restartReview()">Return to course for reference</button>
+    </div>
+  `;
+  app.appendChild(card);
+}
+window.restartReview = function(){
+  state.reviewMode = true;
+  state.priorRecord = {passed:true, score:state.finalScore, date:state.completionDate};
+  state.screen = "reviewHome";
+  render();
+};
+
+/* ---------------- DOC VIEWER ---------------- */
+window.openDoc = function(id){
+  const doc = REFERENCE_DOCS.find(d=>d.id===id);
+  if(!doc) return;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.onclick = (e)=>{ if(e.target===overlay) document.body.removeChild(overlay); };
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <button class="btn-secondary modal-close" onclick="this.closest('.modal-overlay').remove()">Close ✕</button>
+      <h3>${doc.label}</h3>
+      <iframe class="doc-embed" src="${doc.file}"></iframe>
+      <p class="small">If the document doesn't display inline, <a href="${doc.file}" target="_blank">open it in a new tab</a>.</p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+};
+
+function escapeHtml(str){
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+render();
+</script>
+</body>
+</html>
