@@ -127,9 +127,11 @@ const SECTIONS = [
 
     <h3>Practice: a simple light circuit</h3>
     <p>Below is a basic 12V circuit: a battery, a switch, and a lamp (the load), connected by wire. Four
-    test points (A, B, C, D) sit at the connections between components. Select a meter function, then drag
-    each probe onto a test point to take a reading. Try all three meter functions, and try the switch and
-    power toggles to see how the readings change.</p>
+    test points (A, B, C, D) sit at the connections between components. The switch is what energizes or
+    de-energizes the circuit — closed sends power to the lamp, open cuts it off — but the battery itself
+    always has 12V at its own terminals (A and D) whether the switch is open or closed, or even with nothing
+    else connected. Select a meter function, then drag each probe onto a test point to take a reading. Try
+    all three meter functions, and try opening and closing the switch to see how the readings change.</p>
     <div id="dvomWidgetRoot"></div>
   `,
   quiz:[
@@ -148,7 +150,7 @@ const SECTIONS = [
     {q:"To measure current (Amps) correctly, the meter must be connected:",
      opts:["Across two points, just like a voltmeter","In series, in the actual path the current flows through","Only when the circuit is de-energized","It doesn't matter how it's connected"], a:1},
     {q:"To measure resistance (Ohms) correctly, the circuit should be:",
-     opts:["Fully powered and under load","De-energized (power disconnected)","Running at high RPM","Submerged in water"], a:1}
+     opts:["Fully powered and under load","De-energized (switch open / no current flowing)","Running at high RPM","Submerged in water"], a:1}
   ]
 },
 {
@@ -756,7 +758,6 @@ function renderDvomWidget(container){
           <button class="dvom-mode-btn" data-mode="A">Amps</button>
           <button class="dvom-mode-btn" data-mode="OHM">Ohms</button>
         </div>
-        <button class="dvom-toggle on" id="dvomPowerToggle" data-on="1">Circuit power: ON</button>
         <button class="dvom-toggle on" id="dvomSwitchToggle" data-on="1">Switch: CLOSED</button>
       </div>
 
@@ -779,17 +780,23 @@ function renderDvomWidget(container){
         <div class="dvom-comp dvom-lamp" style="left:363px;top:10px;">💡</div>
         <div class="dvom-label" style="left:363px;top:72px;">LAMP (LOAD)<br>4Ω rated</div>
 
+        <!-- gap cover: hides the middle of the switch-to-lamp wire when in Amps mode, to visually "break" it -->
+        <div id="dvomGapCover" style="position:absolute;left:295px;top:33px;width:75px;height:14px;background:#fff;display:none;"></div>
+        <div id="dvomGapLabel" class="dvom-label" style="left:295px;top:16px;color:var(--bad);display:none;">CIRCUIT OPEN — insert meter</div>
+
         <!-- test points -->
         <div class="dvom-tp" data-point="A" style="left:47px;top:70px;">A</div>
         <div class="dvom-tp" data-point="B" style="left:330px;top:41px;">B</div>
         <div class="dvom-tp" data-point="C" style="left:394px;top:130px;">C</div>
         <div class="dvom-tp" data-point="D" style="left:47px;top:190px;">D</div>
+        <div class="dvom-tp" data-point="B_IN" style="left:300px;top:41px;display:none;">IN</div>
+        <div class="dvom-tp" data-point="B_OUT" style="left:360px;top:41px;display:none;">OUT</div>
 
         <!-- probes (positioned via JS) -->
         <div class="dvom-probe red" id="dvomProbeRed"><span>V/Ω/A</span></div>
         <div class="dvom-probe black" id="dvomProbeBlack"><span>COM</span></div>
       </div>
-      <div class="dvom-tray small" style="text-align:center;">Drag the probes above onto test points A–D. Red = V/Ω/A lead, Black = COM (ground) lead.</div>
+      <div class="dvom-tray small" style="text-align:center;" id="dvomInstructions">Drag the probes above onto test points A–D. Red = V/Ω/A lead, Black = COM (ground) lead.</div>
 
       <div class="dvom-meter" id="dvomMeterDisplay">-- . -</div>
       <div class="dvom-note" id="dvomNote">Select a meter function and drag both probes onto test points to take a reading.</div>
@@ -802,17 +809,21 @@ function renderDvomWidget(container){
 function initDvomWidget(root){
   const circuit = root.querySelector("#dvomCircuit");
   const tps = Array.from(root.querySelectorAll(".dvom-tp"));
+  const tpB = tps.find(t => t.dataset.point === "B");
+  const tpBIn = tps.find(t => t.dataset.point === "B_IN");
+  const tpBOut = tps.find(t => t.dataset.point === "B_OUT");
+  const gapCover = root.querySelector("#dvomGapCover");
+  const gapLabel = root.querySelector("#dvomGapLabel");
+  const instructions = root.querySelector("#dvomInstructions");
   const probeRed = root.querySelector("#dvomProbeRed");
   const probeBlack = root.querySelector("#dvomProbeBlack");
   const meterDisplay = root.querySelector("#dvomMeterDisplay");
   const noteEl = root.querySelector("#dvomNote");
-  const powerBtn = root.querySelector("#dvomPowerToggle");
   const switchBtn = root.querySelector("#dvomSwitchToggle");
   const switchIcon = root.querySelector("#dvomSwitchIcon");
   const modeBtns = Array.from(root.querySelectorAll(".dvom-mode-btn"));
 
   let mode = "V";
-  let powerOn = true;
   let switchClosed = true;
   const assign = { red: null, black: null };
 
@@ -826,14 +837,35 @@ function initDvomWidget(root){
     el.style.left = left + "px";
     el.style.top = top + "px";
   }
-  placeProbe(probeRed, trayPositions.red.left, trayPositions.red.top);
-  placeProbe(probeBlack, trayPositions.black.left, trayPositions.black.top);
+  function resetProbes(){
+    assign.red = null; assign.black = null;
+    tps.forEach(t => t.classList.remove("filled"));
+    placeProbe(probeRed, trayPositions.red.left, trayPositions.red.top);
+    placeProbe(probeBlack, trayPositions.black.left, trayPositions.black.top);
+  }
+  resetProbes();
+
+  function updateCircuitForMode(){
+    const isAmps = mode === "A";
+    // In Amps mode, point B is replaced by a visible break (B_IN / B_OUT) that the
+    // meter must be inserted into, in series, to complete the circuit.
+    tpB.style.display = isAmps ? "none" : "flex";
+    tpBIn.style.display = isAmps ? "flex" : "none";
+    tpBOut.style.display = isAmps ? "flex" : "none";
+    gapCover.style.display = isAmps ? "block" : "none";
+    gapLabel.style.display = isAmps ? "block" : "none";
+    instructions.textContent = isAmps
+      ? "The circuit has been opened between the switch and the lamp. Drag the RED probe to IN (the source side) and the BLACK probe to OUT (the load side) to connect the meter in series — this is the only way to correctly measure Amps."
+      : "Drag the probes above onto test points A–D. Red = V/Ω/A lead, Black = COM (ground) lead.";
+  }
 
   function nodeVoltage(node){
-    if(!powerOn) return 0;
+    // The battery itself always has 12V at its own terminals (A and D) — that's true
+    // whether the switch is open or closed, even with no circuit connected at all.
     if(node === "A") return 12;
     if(node === "D") return 0;
     if(node === "C") return 0;
+    // Point B only sees battery voltage once the switch is closed and current can flow there.
     if(node === "B") return switchClosed ? 12 : 0;
   }
 
@@ -854,14 +886,14 @@ function initDvomWidget(root){
   function updateModeButtons(){
     modeBtns.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
   }
-  modeBtns.forEach(b => b.onclick = () => { mode = b.dataset.mode; updateModeButtons(); evaluate(); });
-
-  powerBtn.onclick = () => {
-    powerOn = !powerOn;
-    powerBtn.textContent = "Circuit power: " + (powerOn ? "ON" : "OFF");
-    powerBtn.className = "dvom-toggle " + (powerOn ? "on" : "off");
+  modeBtns.forEach(b => b.onclick = () => {
+    mode = b.dataset.mode;
+    updateModeButtons();
+    updateCircuitForMode();
+    resetProbes(); // leads get repositioned for each new kind of test, same as in the field
     evaluate();
-  };
+  });
+
   switchBtn.onclick = () => {
     switchClosed = !switchClosed;
     switchBtn.textContent = "Switch: " + (switchClosed ? "CLOSED" : "OPEN");
@@ -875,6 +907,7 @@ function initDvomWidget(root){
     const rect = circuit.getBoundingClientRect();
     let best = null, bestDist = 26; // px snap threshold
     tps.forEach(tp => {
+      if(getComputedStyle(tp).display === "none") return; // skip points not active in current mode
       const tRect = tp.getBoundingClientRect();
       const tx = tRect.left + tRect.width/2, ty = tRect.top + tRect.height/2;
       const d = Math.hypot(clientX - tx, clientY - ty);
@@ -944,25 +977,21 @@ function initDvomWidget(root){
     if(mode === "V"){
       const v = Math.abs(nodeVoltage(p1) - nodeVoltage(p2));
       meterDisplay.textContent = v.toFixed(1) + " V";
-      if(!powerOn){
-        setNote("Circuit power is off, so there's no voltage anywhere in the circuit.", false);
-      } else {
-        const pair = [p1,p2].sort().join("");
-        let note = "Voltage reading between " + p1 + " and " + p2 + ".";
-        if(pair === "AB") note = switchClosed
-          ? "0.0V across a CLOSED switch — a good switch has no voltage drop."
-          : "12.0V across an OPEN switch — full battery voltage appears across an open point in the circuit. Classic sign of an open switch or connection.";
-        if(pair === "BC") note = switchClosed
-          ? "12.0V across the lamp — this is where the electrical energy is being used to do work (light the lamp)."
-          : "0.0V across the lamp — no current is flowing (switch open), so there's nothing for the lamp to drop.";
-        if(pair === "CD") note = "0.0V across plain wire — good wire has essentially no resistance, so no voltage drop.";
-        if(pair === "AD") note = "12.0V — full battery/source voltage measured across the whole circuit.";
-        setNote(note, false);
-      }
+      const pair = [p1,p2].sort().join("");
+      let note = "Voltage reading between " + p1 + " and " + p2 + ".";
+      if(pair === "AB") note = switchClosed
+        ? "0.0V across a CLOSED switch — a good switch has no voltage drop."
+        : "12.0V across an OPEN switch — full battery voltage appears across an open point in the circuit. Classic sign of an open switch or connection.";
+      if(pair === "BC") note = switchClosed
+        ? "12.0V across the lamp — this is where the electrical energy is being used to do work (light the lamp)."
+        : "0.0V across the lamp — the switch is open, so no current is flowing and there's nothing for the lamp to drop.";
+      if(pair === "CD") note = "0.0V across plain wire — good wire has essentially no resistance, so no voltage drop.";
+      if(pair === "AD") note = "12.0V — the battery has 12V at its own terminals whether the switch is open or closed. A battery by itself, with no circuit connected at all, still reads full voltage here.";
+      setNote(note, false);
     } else if(mode === "OHM"){
-      if(powerOn){
+      if(switchClosed){
         meterDisplay.textContent = "-OL-";
-        setNote("⚠ Never measure resistance on an energized circuit — turn circuit power OFF first, or you can damage the meter and get a false reading.", true);
+        setNote("⚠ Never measure resistance on an energized circuit — open the switch first to de-energize it, or you can damage the meter and get a false reading.", true);
         return;
       }
       const r = resistanceBetween(p1, p2);
@@ -973,24 +1002,37 @@ function initDvomWidget(root){
         meterDisplay.textContent = r.toFixed(1) + " Ω";
         const pair = [p1,p2].sort().join("");
         let note = "Resistance reading between " + p1 + " and " + p2 + ".";
-        if(pair === "AB") note = "0.0Ω — a closed switch reads as continuity (near-zero resistance).";
         if(pair === "BC") note = "4.0Ω — this is the lamp's own resistance.";
         if(pair === "CD") note = "0.0Ω — plain wire, essentially no resistance.";
         if(pair === "AD" || pair === "AC") note = "Total resistance through the switch and lamp in this path.";
         setNote(note, false);
       }
     } else if(mode === "A"){
-      if(!powerOn){
-        setNote("Circuit power is off, so no current is flowing — there's nothing to measure yet. Turn power on, then remember: an ammeter must be placed IN SERIES (broken into the circuit path), never across two points.", false);
-        meterDisplay.textContent = "0.0 A";
+      const pair = [p1,p2].sort().join("");
+      const isSeriesPair = pair === ["B_IN","B_OUT"].sort().join("");
+      if(!isSeriesPair){
+        meterDisplay.textContent = "-FUSE-";
+        setNote("⚠ Blown fuse! You connected the meter across two points like a voltmeter while set to Amps. An ammeter has almost no resistance, so bridging two points this way creates a dead short. To measure current correctly, the circuit has been broken open between the switch and the lamp — insert the meter IN SERIES at IN/OUT.", true);
         return;
       }
-      meterDisplay.textContent = "-FUSE-";
-      setNote("⚠ Blown fuse! You connected the meter across two points like a voltmeter while set to Amps. An ammeter has almost no resistance, so bridging two points this way creates a dead short. To measure current, you must break the circuit open and put the meter IN SERIES with the current path.", true);
+      if(!switchClosed){
+        meterDisplay.textContent = "0.0 A";
+        setNote("Meter correctly connected in series — but the switch is open, so the circuit is de-energized and no current is flowing.", false);
+        return;
+      }
+      // Correct polarity: current flows A -> switch -> IN -> (through meter) -> OUT -> lamp -> D.
+      // Red (V/Ω/A) lead should be on the upstream/source side (IN); black (COM) on the downstream/load side (OUT).
+      const correctPolarity = assign.red === "B_IN" && assign.black === "B_OUT";
+      const amps = 12 / 4; // Ohm's Law: 12V battery / 4Ω lamp
+      meterDisplay.textContent = (correctPolarity ? amps.toFixed(1) : "-" + amps.toFixed(1)) + " A";
+      setNote(correctPolarity
+        ? "3.0A — correct! The switch is closed (circuit energized). This is Ohm's Law in action: 12V ÷ 4Ω = 3A. The meter is in series, so all the circuit's current flows through it."
+        : "Reading shows -3.0A. The meter is correctly in series and the current value is right, but the leads are reversed — red (V/Ω/A) should be on the source/upstream side, black (COM) on the load/downstream side.", false);
     }
   }
 
   updateModeButtons();
+  updateCircuitForMode();
   evaluate();
 
   // Reposition probes correctly if the window resizes (keeps them anchored to their point/tray).
